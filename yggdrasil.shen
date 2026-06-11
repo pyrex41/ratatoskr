@@ -84,8 +84,10 @@
                     KLFiles    (map (fn bootstrap) Files)
                     KL         (map (fn read-file) KLFiles)
                     UserFs     (function-calls KL)
-                    Foot       (footprint [shen.initialise | UserFs] Graph)
-                    FootCode   (map (/. D (trim-lambda-forms D Foot))
+                    EvalFree   (eval-free? UserFs)
+                    Graph2     (if EvalFree (strip-macros-edge Graph) Graph)
+                    Foot       (footprint [shen.initialise | UserFs] Graph2)
+                    FootCode   (map (/. D (trim-init-tables D Foot EvalFree))
                                     (footcode Foot Kernel))
                     Prims      (find-primitives (append FootCode KL))
                     WriteK     (write-kl-file (@s Dir "/kernel.kl") FootCode)
@@ -93,6 +95,44 @@
                     WriteM     (write-manifest Dir UserOut KL Prims)
                     Restore    (set *maximum-print-sequence-size* MaxPrint)
                     done))
+
+\\ ========================== eval stripping ==============================
+\\ The macro expander's registration in *macros* keeps shen.macros - and
+\\ through it the typechecker, the define-compiler and eval - reachable
+\\ from shen.initialise, putting a ~561-defun floor under every program.
+\\ A compiled program only needs that machinery if it can evaluate Shen
+\\ at runtime.  When the user KL never mentions an eval-capable entry
+\\ point we drop the shen.macros edge from the graph and rewrite the
+\\ *macros* registration to (set *macros* ()) at write time.
+\\ function-calls over-approximates (every symbol counts), which errs in
+\\ the safe direction: a stray symbol named eval keeps the machinery.
+
+(set *eval-entry-points*
+     [eval eval-kl load tc spy track step it
+      read read-from-string lineread input input+ bootstrap])
+
+(define eval-free?
+  UserFs -> (not (intersect? UserFs (value *eval-entry-points*))))
+
+(define intersect?
+  [] _ -> false
+  [X | Xs] Ys -> (or (element? X Ys) (intersect? Xs Ys)))
+
+(define strip-macros-edge
+  [] -> []
+  [[shen.initialise-environment | Calls] | Rows]
+     -> [[shen.initialise-environment | (remove shen.macros Calls)]
+         | (strip-macros-edge Rows)]
+  [[shen.f-error | _] | Rows] -> [[shen.f-error] | (strip-macros-edge Rows)]
+  [Row | Rows] -> [Row | (strip-macros-edge Rows)])
+
+\\ In an eval-stripped program the pattern-failure handler must not offer
+\\ interactive tracking (its y-or-n? prompt calls read, dragging the whole
+\\ reader/typechecker/eval); it just errors.  Counterpart of the
+\\ shen.f-error case in strip-macros-edge.
+(set *static-f-error*
+     [defun shen.f-error [V]
+        [simple-error [cn [str V] ": partial function or unhandled case"]]])
 
 \\ ====================== kernel call graph (cached) ======================
 \\ The original Yggdrasil computed a full transitive closure with Warshall's
@@ -220,13 +260,20 @@
 (define footcode
   Footprint Kernel -> (ygg.filter (/. Def (mentioned? Def Footprint)) Kernel))
 
-\\ Rewrite shen.initialise-lambda-forms to register eta-wrappers only for
-\\ footprint functions (its do-chain is right-nested KL).  Counterpart of
-\\ the called-fns special case above.
-(define trim-lambda-forms
-  [defun shen.initialise-lambda-forms P Body] Foot ->
+\\ Write-time rewrites of the two initialise defuns whose bodies embed
+\\ registration tables (right-nested do-chains):
+\\   - lambda-forms registers eta-wrappers only for footprint functions
+\\     (counterpart of the called-fns special case above);
+\\   - when eval-stripping, the *macros* registration in
+\\     initialise-environment becomes (set *macros* ()) (counterpart of
+\\     strip-macros-edge).
+(define trim-init-tables
+  [defun shen.initialise-lambda-forms P Body] Foot _ ->
       [defun shen.initialise-lambda-forms P (trim-lf-chain Body Foot)]
-  Def _ -> Def)
+  [defun shen.initialise-environment P Body] Foot true ->
+      [defun shen.initialise-environment P (strip-macros-chain Body Foot)]
+  [defun shen.f-error | _] _ true -> (value *static-f-error*)
+  Def _ _ -> Def)
 
 (define trim-lf-chain
   [do E Rest] Foot -> (let R (trim-lf-chain Rest Foot)
@@ -236,6 +283,41 @@
 (define lf-keep?
   [shen.set-lambda-form-entry [cons F _]] Foot -> (element? F Foot)
   _ _ -> true)
+
+\\ Alongside emptying *macros*, restrict the arity-table literal to the
+\\ footprint (plus primitives): an eval-stripped program can never define
+\\ or look up functions outside its footprint, and the full literal both
+\\ bloats kernel.kl and re-introduces stray names (eval-kl among them)
+\\ that find-primitives would report.
+(define strip-macros-chain
+  [do [set *macros* _] Rest] Foot -> [do [set *macros* []] (strip-macros-chain Rest Foot)]
+  [do [shen.initialise-arity-table Lit] Rest] Foot ->
+      [do [shen.initialise-arity-table (trim-arity-pairs Lit (keep-set Foot))]
+          (strip-macros-chain Rest Foot)]
+  [do [put P shen.external-symbols Lit V] Rest] Foot ->
+      [do [put P shen.external-symbols (trim-sym-list Lit (keep-set Foot)) V]
+          (strip-macros-chain Rest Foot)]
+  [do E Rest] Foot -> [do E (strip-macros-chain Rest Foot)]
+  E _ -> E)
+
+\\ Names worth keeping in the stripped data tables: footprint plus
+\\ primitives, minus the eval entry points (unreachable by construction).
+(define keep-set
+  Foot -> (ygg.filter (/. F (not (element? F (value *eval-entry-points*))))
+                      (append Foot (value *primitives*))))
+
+(define trim-arity-pairs
+  [cons Name [cons Arity Rest]] Keep ->
+      (if (element? Name Keep)
+          [cons Name [cons Arity (trim-arity-pairs Rest Keep)]]
+          (trim-arity-pairs Rest Keep))
+  X _ -> X)
+
+(define trim-sym-list
+  [cons Name Rest] Keep -> (if (element? Name Keep)
+                               [cons Name (trim-sym-list Rest Keep)]
+                               (trim-sym-list Rest Keep))
+  X _ -> X)
 
 (define mentioned?
   [defun F | _] Fs -> (element? F Fs)
