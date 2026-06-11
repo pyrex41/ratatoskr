@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Yggdrasil 2.0 - stage-2 Common Lisp (SBCL) builder.
+# Yggdrasil 2.0 - stage-2 Common Lisp builder.
 #
 #   builders/lisp/build.sh <shaken-dir> <output-exe>
 #
@@ -8,9 +8,12 @@
 # executable at <output-exe>.
 #
 # Overridable environment:
-#   SHEN_BIN  - shen-cl binary       (default: $SHEN_CL/bin/sbcl/shen)
-#   SBCL_BIN  - sbcl binary          (default: sbcl on PATH)
-#   SHEN_CL   - shen-cl checkout     (default: sibling ../shen-cl)
+#   LISP_IMPL - sbcl (default) | clisp | ecl
+#               (ccl unsupported: no native Apple Silicon build)
+#   LISP_BIN  - the implementation binary (default: $LISP_IMPL on PATH;
+#               sbcl also honors legacy SBCL_BIN)
+#   SHEN_BIN  - shen-cl binary           (default: $SHEN_CL/bin/sbcl/shen)
+#   SHEN_CL   - shen-cl checkout         (default: sibling ../shen-cl)
 set -euo pipefail
 
 if [ $# -ne 2 ]; then
@@ -21,7 +24,14 @@ fi
 YGG_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 SHEN_CL="${SHEN_CL:-$(cd "$YGG_ROOT/../shen-cl" && pwd)}"
 SHEN_BIN="${SHEN_BIN:-$SHEN_CL/bin/sbcl/shen}"
-SBCL_BIN="${SBCL_BIN:-sbcl}"
+LISP_IMPL="${LISP_IMPL:-sbcl}"
+
+case "$LISP_IMPL" in
+    sbcl)  LISP_BIN="${LISP_BIN:-${SBCL_BIN:-sbcl}}" ;;
+    clisp) LISP_BIN="${LISP_BIN:-clisp}" ;;
+    ecl)   LISP_BIN="${LISP_BIN:-ecl}" ;;
+    *) echo "unsupported LISP_IMPL: $LISP_IMPL (sbcl|clisp|ecl)" >&2; exit 2 ;;
+esac
 
 DIR="$1"
 EXE="$2"
@@ -36,9 +46,14 @@ cd "$YGG_ROOT"
     -e "(set lsp.*shen-cl* \"$SHEN_CL/\")" \
     -e "(lsp.build \"$DIR\" \"$EXE\")"
 
-# Build: load the runtime + shaken kernel + user code, initialise, save.
+# Build: load the runtime + shaken kernel + user code, initialise, emit the
+# executable (saved image on sbcl/clisp; compiled-and-linked binary on ecl).
 cd "$DIR"
-"$SBCL_BIN" --non-interactive --no-userinit --no-sysinit --load driver.lsp
+case "$LISP_IMPL" in
+    sbcl)  "$LISP_BIN" --non-interactive --no-userinit --no-sysinit --load driver.lsp ;;
+    clisp) "$LISP_BIN" -norc -q driver.lsp ;;
+    ecl)   "$LISP_BIN" --norc --load driver.lsp ;;
+esac
 
-rm -f "$DIR"/*.fasl
-echo "yggdrasil/lisp: built $EXE"
+rm -f "$DIR"/*.fasl "$DIR"/*.fas "$DIR"/*.lib "$DIR"/*.o
+echo "yggdrasil/lisp: built $EXE ($LISP_IMPL)"

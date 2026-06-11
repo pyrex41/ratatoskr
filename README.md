@@ -32,7 +32,7 @@ repo):
 
 | target | builder | output (eval-stripped fib) |
 |---|---|---|
-| Common Lisp / SBCL | `builders/lisp/build.sh <dir> <exe>` (this repo) | native executable (~36 MB, dominated by SBCL image) |
+| Common Lisp | `builders/lisp/build.sh <dir> <exe>` (this repo; `LISP_IMPL=sbcl\|clisp\|ecl`) | saved image (SBCL ~36 MB, CLISP ~7.8 MB) or compiled binary (ECL ~620 KB + libecl) |
 | LuaJIT | `shen-lua/bin/yggdrasil-build.lua <dir> <out.lua>` | self-contained .lua (~640 KB, ~25 ms startup) |
 | Go | `shen-go/cmd/yggdrasil-build <dir> <outdir>` then `go build` | static binary (~4.5 MB, ≤10 ms startup, cross-compiles linux/windows) |
 | Rust | `shen-rust/crates/yggdrasil-build <dir> <outdir>` then `cargo build --release` | static binary (~9 MB, ~40 ms startup) |
@@ -85,5 +85,16 @@ symbol named `eval` keeps the machinery.
 `hello from shaken shen`, `fib 20 = 6765`, `mary likes chocolate: true`.
 Every stage-1 change should be verified through at least one stage-2
 builder (the Lua one is fastest).
+
+The Lisp builder is verified on SBCL, GNU CLISP and ECL (`LISP_IMPL=`).
+CCL is unsupported: no native Apple Silicon build exists. Implementation
+notes that cost real debugging: shen-cl's native `pr` override is
+`#+(or ccl sbcl)`, so other implementations need the optional stream
+primitives (`shen.write-string` etc. — the driver installs portable
+fallbacks when missing); and streams captured in a saved image are dead
+on restart under CLISP, so the image toplevel rebinds
+`*stoutput*`/`*stinput*` at startup. ECL cannot dump images at all — the
+driver compiles each module to an object file and links a real
+executable via `c:build-program`, with boot replayed at program startup.
 
 [shen-cl]: https://github.com/Shen-Language/shen-cl
