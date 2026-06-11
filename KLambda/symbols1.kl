@@ -1,5 +1,0 @@
-(defun concat* (V23610 V23611) (let W23612 (concat V23610 V23611) (if (symbol? W23612) W23612 (simple-error (cn "'" (shen.app W23612 "' is not a symbol
-" shen.a))))))
-
-(declare concat* (cons A (cons --> (cons (cons B (cons --> (cons symbol ()))) ()))))
-

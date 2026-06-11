@@ -1,8 +1,0 @@
-(defun c+ (V24039 V24040) (let W24041 (real V24039) (let W24042 (imaginary V24039) (let W24043 (real V24040) (let W24044 (imaginary V24040) (c# (+ W24041 W24043) (+ W24042 W24044)))))))
-
-(defun c- (V24045 V24046) (let W24047 (real V24045) (let W24048 (imaginary V24045) (let W24049 (real V24046) (let W24050 (imaginary V24046) (c# (- W24047 W24049) (- W24048 W24050)))))))
-
-(defun c* (V24051 V24052) (let W24053 (real V24051) (let W24054 (imaginary V24051) (let W24055 (real V24052) (let W24056 (imaginary V24052) (c# (- (* W24053 W24055) (* W24054 W24056)) (+ (* W24054 W24055) (* W24053 W24056))))))))
-
-(defun c/ (V24057 V24058) (let W24059 (real V24057) (let W24060 (imaginary V24057) (let W24061 (real V24058) (let W24062 (imaginary V24058) (c# (/ (+ (* W24059 W24061) (* W24060 W24062)) (+ (* W24061 W24061) (* W24062 W24062))) (/ (- (* W24060 W24061) (* W24059 W24062)) (+ (* W24061 W24061) (* W24062 W24062)))))))))
-

@@ -1,0 +1,4 @@
+out*/
+tests/*.kl
+KLambda/callgraph-41.1.shen
+*.fasl

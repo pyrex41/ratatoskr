@@ -1,13 +1,15 @@
 \\                                    Package for Generating Common Lisp
 \\                                    (c) Mark Tarver 2023, 3 clause BSD
 
-(package cl (append (external stlib) [compiler boilerplate driver])
+\\ No package wrapper (41.1 has no stlib package); see yggdrasil.shen.
 
-(put "lsp" compiler (fn lisp-compiler)) 
+(put "lsp" compiler (fn lisp-compiler))
 
+\\ shen-cl 41.1 names its KL->Lisp compiler shen-cl.kl->lisp
+\\ (src/compiler.shen); earlier shen-cl releases used cl.kl-to-lisp.
 (define lisp-compiler
   [defun fail |_] -> "(DEFUN fail () 'shen.fail!)"
-  X -> (make-string "~R~%" ((foreign cl.kl-to-lisp) X)))
+  X -> (make-string "~R~%" ((foreign shen-cl.kl->lisp) X)))
 
 (put "lsp" boilerplate "(SETF (READTABLE-CASE *READTABLE*) :PRESERVE)
 
@@ -66,15 +68,15 @@
 (put string? "lsp" ["Primitives/CL/isstring.lsp"])
 (put n->string "lsp" ["Primitives/CL/n-to-string.lsp"])
 (put string->n "lsp" ["Primitives/CL/string-to-n.lsp"])
-(put set "lsp" ["Primitives/CL/string-to-n.lsp"])
+(put set "lsp" ["Primitives/CL/set.lsp"])
 (put value "lsp" ["Primitives/CL/value.lsp"])
 (put simple-error "lsp" ["Primitives/CL/simple-error.lsp"])
 (put trap-error "lsp" ["Primitives/CL/trap-error.lsp"])
 (put error-to-string "lsp" ["Primitives/CL/error-to-string.lsp"])
-(put cons "lsp" ["Primitives/CL/error-to-string.lsp"])
+(put cons "lsp" ["Primitives/CL/cons.lsp"])
 (put hd "lsp" ["Primitives/CL/hd.lsp"])
 (put tl "lsp" ["Primitives/CL/tl.lsp"])
-(put cons? "lsp" [])
+(put cons? "lsp" ["Primitives/CL/iscons.lsp"])
 (put absvector "lsp" ["Primitives/CL/absvector.lsp"])
 (put address-> "lsp" ["Primitives/CL/address-send.lsp"])
 (put <-address "lsp" ["Primitives/CL/address-get.lsp"])
@@ -83,8 +85,7 @@
 (put read-byte "lsp" ["Primitives/CL/read-byte.lsp"])
 (put open "lsp" ["Primitives/CL/open.lsp"])
 (put close "lsp" ["Primitives/CL/close.lsp"])
-(put prolog-memory "lsp" ["Primitives/CL/prolog-memory.lsp"])
-(put vector "lsp" ["Primitives/CL/vector.lsp"])
+\\ prolog-memory and vector are kernel-defined in 41.1, no longer primitives.
 (put + "lsp" ["Primitives/CL/arith.lsp"])
 (put - "lsp" ["Primitives/CL/arith.lsp"])
 (put * "lsp" ["Primitives/CL/arith.lsp"])
@@ -107,4 +108,4 @@
 (put shen.write-string "lsp" ["Primitives/CL/write-string.lsp"])
 (put shen.read-unit-string "lsp" ["Primitives/CL/read-unit-string.lsp"])
 (put *stoutput* "lsp" ["Primitives/CL/stoutput.lsp"])
-(put *stinput* "lsp"  ["Primitives/CL/stinput.lsp"]))
+(put *stinput* "lsp"  ["Primitives/CL/stinput.lsp"])
