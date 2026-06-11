@@ -3,6 +3,13 @@
 A tree-shaker for [Shen](https://shenlanguage.org) programs, retargeted to
 ShenOSKernel **41.2**. Based on Mark Tarver's Yggdrasil 1.0 (3-clause BSD).
 
+Dr. Tarver's original vision and description, *Using Yggdrasil to Generate
+Stand-alone Programs from Shen* (Shen Group, 2023), is preserved here as
+[`yggdrasil.pdf`](yggdrasil.pdf). The 1.0 distribution this repository
+started from is archived in [`archive/`](archive/) along with the
+[Wayback Machine capture](https://web.archive.org/web/20240430183437/https://www.shenlanguage.org/Download/Yggdrasil.zip)
+it was retrieved from.
+
 Yggdrasil turns a Shen program into a minimal, standalone artifact in a
 target language: it computes which of the kernel's 1129 functions the
 program can actually reach, emits just that slice as KLambda, and hands the
