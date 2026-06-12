@@ -7,14 +7,14 @@
 This repo is Ratatoskr, a tree-shaker for Shen programs: stage 1
 computes the reachable ShenOSKernel-41.2 slice and emits KLambda + a
 manifest; per-target stage-2 builders compile it for Common Lisp, LuaJIT,
-Go, and Rust. See README.md and DEMO.md for exact invocations.
+Go, Rust, and JavaScript. See README.md and DEMO.md for exact invocations.
 
 ## Goal
 
 A parser workbench in the langsec tradition: define a binary wire format
 *as a grammar*, analyze the grammar, and ship the same verified parser to
 multiple production runtimes. One sentence: **grammar in, verified parser
-out, on four runtimes.**
+out, on five runtimes.**
 
 The motivating claim: parsers of untrusted input are where the CVEs live,
 and the langsec answer — parse with verified grammars, not hand-rolled

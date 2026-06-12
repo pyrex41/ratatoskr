@@ -22,7 +22,7 @@ KL compiler.
 
 **See it run:** [`DEMO.md`](DEMO.md) is an executable demo (built with
 [showboat]) that shakes one program and produces a running artifact on all
-four targets; `showboat verify DEMO.md` re-executes every step.
+five targets; `showboat verify DEMO.md` re-executes every step.
 
 ## Architecture
 
@@ -51,6 +51,7 @@ repo):
 | LuaJIT | `shen-lua/bin/ratatoskr-build.lua <dir> <out.lua>` | self-contained .lua (~640 KB, ~25 ms startup) |
 | Go | `shen-go/cmd/ratatoskr-build <dir> <outdir>` then `go build` | static binary (~4.5 MB, ≤10 ms startup, cross-compiles linux/windows) |
 | Rust | `shen-rust/crates/ratatoskr-build <dir> <outdir>` then `cargo build --release` | static binary (~9 MB, ~40 ms startup) |
+| JavaScript | `node ShenScript/bin/ratatoskr-build.js <dir> <out.js>` (`--linked` for needs-eval) | self-contained ES module (~120 KB, runs on Node 20+ / Bun / Deno 2) |
 
 **Builder contract**: load `kernel.kl`'s defuns, call `(shen.initialise)`
 (41.2 consolidates all global initialisation there), then run each user

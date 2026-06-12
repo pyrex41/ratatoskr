@@ -1,11 +1,11 @@
-# Ratatoskr: one Shen program, four native targets
+# Ratatoskr: one Shen program, five targets
 
 *2026-06-11T22:53:26Z by Showboat 0.6.1*
 <!-- showboat-id: f13bb21e-fd4c-4bea-b91b-3c2b524ba3d8 -->
 
-[Ratatoskr](README.md) tree-shakes a [Shen](https://shenlanguage.org) program against the ShenOSKernel-41.2 and emits the minimal KLambda slice plus a manifest; per-target builders in the sibling port repos then compile that slice with each port's own KL compiler. This demo shakes one program and produces a running artifact on **Common Lisp (SBCL), LuaJIT, Rust, and Go**.
+[Ratatoskr](README.md) tree-shakes a [Shen](https://shenlanguage.org) program against the ShenOSKernel-41.2 and emits the minimal KLambda slice plus a manifest; per-target builders in the sibling port repos then compile that slice with each port's own KL compiler. This demo shakes one program and produces a running artifact on **Common Lisp (SBCL), LuaJIT, Rust, Go, and JavaScript (Node)**.
 
-Assumptions: sibling checkouts `../shen-cl` (with a built `bin/sbcl/shen`), `../shen-lua`, `../shen-rust`, `../shen-go`, and `sbcl`, `luajit`, `cargo`, `go` on PATH. Run from the Ratatoskr repo root.
+Assumptions: sibling checkouts `../shen-cl` (with a built `bin/sbcl/shen`), `../shen-lua`, `../shen-rust`, `../shen-go`, `../ShenScript`, and `sbcl`, `luajit`, `cargo`, `go`, `node` on PATH. Run from the Ratatoskr repo root.
 
 The program: `tests/fib.shen` —
 
@@ -113,9 +113,21 @@ ELF 64-bit LSB executable, x86-64
 statically linked
 ```
 
+## Stage 2 — JavaScript (Node / Bun / Deno)
+
+The ShenScript builder AOT-compiles the slice with its own KL→JS compiler and emits one self-contained ES module (~120 KB, no dependencies) that runs on Node 20+, Bun, and Deno 2.
+
+```bash
+node ../ShenScript/bin/ratatoskr-build.js out-demo out-demo/fib.js >/dev/null 2>&1 && node out-demo/fib.js
+```
+
+```output
+fib 20 = 6765
+```
+
 ## The tally
 
-One 7-line Shen program, one shake, four independently-runnable artifacts:
+One 7-line Shen program, one shake, five independently-runnable artifacts:
 
 | target | artifact | runs via |
 |---|---|---|
@@ -123,11 +135,12 @@ One 7-line Shen program, one shake, four independently-runnable artifacts:
 | LuaJIT | `out-demo/fib.lua` | `luajit fib.lua` |
 | Rust | `out-demo/fib-rust/target/release/fib-rust` | native executable |
 | Go | `out-demo/fib-go-bin` (+ a linux/amd64 cross-build) | static native executable |
+| JavaScript | `out-demo/fib.js` | `node fib.js` (also `bun` / `deno run`) |
 
-All four printed `fib 20 = 6765` from a kernel slice of 102 functions — the other 1027 were shaken away. Re-execute this document with `showboat verify DEMO.md`.
+All five printed `fib 20 = 6765` from a kernel slice of 102 functions — the other 1027 were shaken away. Re-execute this document with `showboat verify DEMO.md`.
 
 ```bash
-ls out-demo/fib-lisp out-demo/fib.lua out-demo/fib-rust/target/release/fib-rust out-demo/fib-go-bin out-demo/fib-go-linux
+ls out-demo/fib-lisp out-demo/fib.lua out-demo/fib-rust/target/release/fib-rust out-demo/fib-go-bin out-demo/fib-go-linux out-demo/fib.js
 ```
 
 ```output
@@ -135,5 +148,6 @@ out-demo/fib-go-bin
 out-demo/fib-go-linux
 out-demo/fib-lisp
 out-demo/fib-rust/target/release/fib-rust
+out-demo/fib.js
 out-demo/fib.lua
 ```

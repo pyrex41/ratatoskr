@@ -1,4 +1,4 @@
-# Prompt: Authorization engine — one verified policy source, four runtimes
+# Prompt: Authorization engine — one verified policy source, five runtimes
 
 > Idea 3 of [demo_ideas.md](../demo_ideas.md). The ambitious flagship —
 > build after the firewall compiler proves the policy-as-binary machinery.
@@ -8,7 +8,8 @@
 This repo is Ratatoskr, a tree-shaker for Shen programs: stage 1
 computes the reachable ShenOSKernel-41.2 slice and emits KLambda + a
 manifest; per-target stage-2 builders compile it for Common Lisp, LuaJIT
-(self-contained ~640 KB .lua), Go (static ~4.5 MB binary), and Rust. See
+(self-contained ~640 KB .lua), Go (static ~4.5 MB binary), Rust, and
+JavaScript (self-contained ~120 KB ES module via ShenScript). See
 README.md and DEMO.md for exact invocations.
 
 ## Goal
@@ -19,8 +20,8 @@ The hook: AWS Cedar maintains Dafny proofs *alongside* a separate Rust
 implementation and must keep them in sync; OPA/Rego has no proofs at all.
 Here there is nothing to keep in sync — and Ratatoskr's multi-target story
 is the moat: the **same shaken slice** becomes the Lua module in the API
-gateway, the Go middleware in the services, and the Rust library at the
-edge. Identical decision semantics by construction, not by discipline.
+gateway, the Go middleware in the services, the JS module in the Node
+services, and the Rust library at the edge. Identical decision semantics by construction, not by discipline.
 
 ## What it does
 
@@ -45,11 +46,12 @@ edge. Identical decision semantics by construction, not by discipline.
      condition C (e.g. MFA)?"
 4. **Compilation**: emit a specialized Shen decision program per policy
    set (straight pattern matching, no interpreter — the policy-as-binary
-   pattern), shake it (`needs-eval=false`), and build **all four targets**
+   pattern), shake it (`needs-eval=false`), and build **all five targets**
    from the same output dir.
 5. **Host adapters** (thin, per target): nginx `access_by_lua` glue for
    the Lua artifact; a `net/http` middleware example calling the Go
-   artifact; a Rust CLI wrapping the Rust artifact; the Lisp image as the
+   artifact; an Express/Fastify middleware importing the JS artifact; a
+   Rust CLI wrapping the Rust artifact; the Lisp image as the
    interactive/analysis REPL.
 
 ## Constraints and gotchas
@@ -70,7 +72,7 @@ edge. Identical decision semantics by construction, not by discipline.
   roles, an MFA-conditioned admin action, at least one forbid override.
 - Host adapter examples for at least Lua/nginx and Go.
 - A showboat-style `DEMO.md`:
-  1. compile → proofs → four artifacts from one source
+  1. compile → proofs → five artifacts from one source
   2. the same request denied by nginx, the Go middleware, and the Rust
      CLI — **byte-identical reason string** from all three
   3. a policy PR that quietly broadens access → the diff query prints the

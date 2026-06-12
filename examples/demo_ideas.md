@@ -14,8 +14,9 @@ Shen's distinctive features, and what a showcase must exercise:
    reachability, shadowing, trust paths, access diffs.
 3. **Shen-YACC / `defcc`** — a compiler-compiler in the box. DSLs are cheap.
 4. **Ratatoskr itself** — one source shakes to a ~640 KB Lua file, a
-   ~4.5 MB static Go binary (≤10 ms startup), a Rust binary, or a Lisp
-   image. Eval-stripped programs carry only ~100 kernel defuns.
+   ~4.5 MB static Go binary (≤10 ms startup), a Rust binary, a ~120 KB
+   self-contained JS module (Node/Bun/Deno), or a Lisp image.
+   Eval-stripped programs carry only ~100 kernel defuns.
 
 The hard constraint that shapes everything: **the shaken kernel has no
 networking, threads, or crypto primitives, and port I/O differs.** The
@@ -150,13 +151,13 @@ engine are **one source**. There is nothing to keep in sync.
 - Typed policy well-formedness: a custom type theory where ill-scoped
   attributes or unsatisfiable conditions are *type errors*.
 - **The multi-target moat:** the same shaken slice becomes the Lua module
-  in the API gateway, the Go middleware in the services, and the Rust
-  library at the edge. Provably identical semantics across the stack —
-  it is literally the same kernel slice, not three reimplementations that
-  drift. Policy-engine drift between enforcement points is a real, named
+  in the API gateway, the Go middleware in the services, the JS module in
+  the Node services, and the Rust library at the edge. Provably identical
+  semantics across the stack — it is literally the same kernel slice, not
+  four reimplementations that drift. Policy-engine drift between enforcement points is a real, named
   security problem.
 
-**Demo money-shot:** one policy file → four artifacts → the same denial
+**Demo money-shot:** one policy file → five artifacts → the same denial
 decision, byte-identical reason string, from nginx, a Go HTTP middleware,
 and a Rust CLI. Then a policy PR that quietly broadens access → CI query
 prints the exact new (principal, action, resource) triples it would grant.
@@ -170,7 +171,7 @@ policy-as-binary trick from Idea 1) keep it fast.
 
 ## Idea 4 — Binary-protocol parser workbench (langsec angle)
 
-**One-liner:** Grammar in, verified parser out, on four runtimes.
+**One-liner:** Grammar in, verified parser out, on five runtimes.
 
 **The hook:** parsers of untrusted input are where the CVEs live
 (heartbleed-class bugs are parser bugs). The langsec community's answer is
@@ -232,8 +233,8 @@ blog-post material; weaker live demo.
 |---|---|---|---|---|---|---|
 | 1. Firewall compiler (OpenResty) | totality, consistency | shadowing, diffs | policy DSL | **Lua is the star** + Go | ⭐⭐⭐ counterexample → curl | medium |
 | 2. Mesh control plane | conformance | trust paths, partition | topology files | Go static binary | ⭐⭐ live wg mesh | medium |
-| 3. Authorization engine | well-formedness | access diffs | policy language | **all four, identical semantics** | ⭐⭐⭐ cross-stack denial | large |
-| 4. Parser workbench | length/range judgments | ambiguity | **grammars are the product** | Rust + Lua + Go | ⭐⭐ differential fuzzing | medium |
+| 3. Authorization engine | well-formedness | access diffs | policy language | **all five, identical semantics** | ⭐⭐⭐ cross-stack denial | large |
+| 4. Parser workbench | length/range judgments | ambiguity | **grammars are the product** | Rust + Lua + Go + JS | ⭐⭐ differential fuzzing | medium |
 | 5. Config generator | **purest type flex** | cross-doc queries | config DSL | Go CLI only | ⭐ | small–medium |
 
 ## Recommendation
