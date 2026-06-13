@@ -20,11 +20,13 @@ program can actually reach, emits just that slice as KLambda, and hands the
 result to a per-target builder that compiles it with the target port's own
 KL compiler.
 
-> **The shaker runs on [shen-cl] only.** Stage 1 is pure Shen, but it
-> compiles your program to KLambda with the host's `bootstrap` compiler,
-> and shen-cl is the only host verified to emit fully portable KL (see
-> the Gotchas section for what happens on other hosts). The five *output*
-> targets are unaffected — shake on shen-cl, deploy anywhere.
+> **The shaker runs on any of the five ports.** Stage 1 is pure Shen, but
+> it compiles your program to KLambda with the host's `bootstrap`
+> compiler, so the host must emit fully portable KL. All five ports —
+> shen-cl, shen-lua, shen-go, shen-rust and ShenScript — are now verified
+> to produce a byte-identical `kernel.kl` + manifest and portable user KL
+> (see the Gotchas section for the per-host launcher invocation and the
+> `*hush*` caveat). shen-cl remains the reference and the fastest host.
 
 **See it run:** [`DEMO.md`](DEMO.md) is an executable demo (built with
 [showboat]) that shakes one program and produces a running artifact on all
@@ -32,8 +34,8 @@ five targets; `showboat verify DEMO.md` re-executes every step.
 
 ## Architecture
 
-**Stage 1 — shake** (this repo; **run on [shen-cl]** — see the
-host-portability gotcha):
+**Stage 1 — shake** (this repo; run on any of the five ports — see the
+host-portability gotcha for per-host launcher syntax):
 
 ```
 shen eval -q -l ratatoskr.shen -e '(ratatoskr.shake ["prog.shen"] "out")'
@@ -108,18 +110,24 @@ mode refuses eval-capable manifests).
   `ratatoskr.shen` carries its own `rat.*` versions.
 - Compiled KL carries explicit property-table arguments — e.g. the
   external-symbols registration is a 5-element `put` node, not 4.
-- **Stage 1 host portability is narrower than "any certified Shen"**
-  (measured 2026-06-12): the shake logic itself is portable — shen-lua
-  as host produces a byte-identical `kernel.kl` and manifest — but the
-  user program's KL comes from the host port's `bootstrap` (shen→KL)
-  compiler, which may not emit self-contained KL. shen-lua compiles
-  `prolog?` queries to port-internal registry hooks
-  (`shen.lua-run-query*`) that no builder can load, so prolog-using
-  programs shake correctly only on shen-cl; plain programs (fib) shake
-  identically on both (modulo gensym numbering). shen-go's stock CLI
-  has no `-l`/`-e` launcher, and ShenScript's eval path did not finish
-  the kernel walk in 50+ minutes (shen-cl: 0.03 s). **Use shen-cl to
-  shake.**
+- **Stage 1 runs on all five ports** (verified 2026-06-12 for `fib` and
+  `prolog`: byte-identical `kernel.kl` + manifest against the shen-cl
+  reference, user KL identical modulo gensym numbering). Getting there
+  took one fix per non-shen-cl host, since the user program's KL comes
+  from the host's `bootstrap` (shen→KL) compiler and each had a way of
+  emitting non-portable KL:
+  - **shen-cl** — reference host, fastest (~0.06 s): `shen eval -q -l ratatoskr.shen -e '(ratatoskr.shake ["prog.shen"] "out")'`
+  - **shen-lua** — `bin/shen ratatoskr.shen -e '(ratatoskr.shake ...)'`. Its native engine compiled `prolog?` to port-local `shen.lua-run-query*` hooks; that expansion is now gated to skip the dynamic extent of `bootstrap`, so compiled `.kl` carries the kernel's portable CPS expansion.
+  - **shen-go** — `shen eval -q -l ratatoskr.shen -e '(ratatoskr.shake ...)'`. Gained the standard launcher CLI (`extension-launcher.kl`); the stock binary previously had no `-l`/`-e` and fell straight into the REPL.
+  - **shen-rust** — `shen-rust eval -l ratatoskr.shen -e '(ratatoskr.shake ...)'`. Gained the same launcher CLI (on a 1 GB-stack thread for the deep call-graph walk); also fixed `open/2` to honour the `in`/`out` direction symbol so the KL writers truncate-for-write.
+  - **ShenScript** — `node bin/shen.js eval -l ratatoskr.shen -e '(ratatoskr.shake ...)'`. The async `read-byte`/file streams left EOF as an unsettled promise, so `read-file-as-bytelist` looped forever (the 50-min hang); file streams are now synchronous and the shake finishes in ~25 s.
+  - **`*hush*` caveat**: `-q` sets `*hush*`, and on **shen-lua and
+    shen-rust** that silences the `pr` writes to the output files,
+    producing zero-byte artifacts — **omit `-q` on those two**. shen-cl
+    (native `pr` override), shen-go and ShenScript route `pr` to file
+    streams regardless of `*hush*`, so `-q` is harmless there. Dropping
+    `-q` everywhere is the safe default; it only adds a load-echo line to
+    stdout, not to the artifacts.
 
 ## Tests
 
