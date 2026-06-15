@@ -153,7 +153,23 @@
 \\ corrupting any row whose head's declared arity differs from its length.
 
 (define kernel-code
-  -> (mapcan (fn read-file) (value *kernel*)))
+  -> (mapcan (fn read-kl-file) (value *kernel*)))
+
+\\ The kernel files are already fully-expanded KL.  read-file runs them
+\\ back through the macro expander, which - on the 41.2 kernel - is fatal:
+\\ stlib.kl's own (defun vector.vector-macros ...) embeds literal
+\\ (vector.array-> ...) sub-forms, and the live vector.vector-macros macro
+\\ fires on them, trying to macro-expand a non-literal dimensional argument
+\\ ((hd (tl V2049))) and aborting with "cannot macro expand the dimensional
+\\ argument".  read-kl-file mirrors read-file's pipeline (raw s-exprs ->
+\\ find-arities/types -> currying transform) but skips macroexpand, so
+\\ already-compiled KL is read verbatim - both correct and crash-free.
+(define read-kl-file
+  File -> (let Bytes  (read-file-as-bytelist File)
+               Sexprs (compile (/. Z (shen.<s-exprs> Z)) Bytes)
+               Arits  (shen.find-arities Sexprs)
+               Types  (shen.find-types Sexprs)
+               (map (/. S (shen.process-applications S Types)) Sexprs)))
 
 (define call-graph
   Code -> (trap-error (load-call-graph) (/. E (build-call-graph Code))))
