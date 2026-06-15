@@ -166,8 +166,8 @@
 \\ already-compiled KL is read verbatim - both correct and crash-free.
 (define read-kl-file
   File -> (let Bytes  (read-file-as-bytelist File)
-               Sexprs (compile (/. Z (shen.<s-exprs> Z)) Bytes)
-               Arits  (shen.find-arities Sexprs)
+               Sexprs (trap-error (compile (/. Z (shen.<s-exprs> Z)) Bytes)
+                                  (/. E (shen.reader-error (value shen.*residue*))))
                Types  (shen.find-types Sexprs)
                (map (/. S (shen.process-applications S Types)) Sexprs)))
 
