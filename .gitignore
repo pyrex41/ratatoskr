@@ -5,3 +5,7 @@ KLambda/callgraph-41.2.shen
 
 # Compiled Go binary bundled into the uvx wheel at build time.
 pybin/*/_bin/
+
+# Default `go build` output.
+/ratatoskr
+/ratatoskr_bin
