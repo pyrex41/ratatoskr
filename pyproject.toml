@@ -1,0 +1,41 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ratatoskr-shen"
+version = "0.1.0"
+description = "Ratatoskr — a tree-shaker for Shen programs (CLI wrapper)"
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "BSD-3-Clause" }
+keywords = ["shen", "tree-shaking", "klambda", "compiler"]
+dependencies = []
+
+[project.scripts]
+ratatoskr = "ratatoskr_cli:main"
+
+# Ship the wrapper module plus everything ratatoskr.shen needs at runtime: the
+# shaker source, the kernel KLambda slice + callgraph cache, the per-language
+# Primitives, the in-repo builders, and the build recipe table. They install
+# next to the module so HERE-relative resolution finds them after `uvx`.
+[tool.hatch.build.targets.wheel]
+only-include = [
+  "ratatoskr_cli.py",
+  "ratatoskr.shen",
+  "builders.json",
+  "KLambda",
+  "Primitives",
+  "builders",
+]
+
+[tool.hatch.build.targets.sdist]
+include = [
+  "ratatoskr_cli.py",
+  "ratatoskr.shen",
+  "builders.json",
+  "KLambda",
+  "Primitives",
+  "builders",
+  "README.md",
+]

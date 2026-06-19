@@ -20,17 +20,48 @@ program can actually reach, emits just that slice as KLambda, and hands the
 result to a per-target builder that compiles it with the target port's own
 KL compiler.
 
-> **The shaker runs on any of the five ports.** Stage 1 is pure Shen, but
+> **The shaker runs on any of the six ports.** Stage 1 is pure Shen, but
 > it compiles your program to KLambda with the host's `bootstrap`
-> compiler, so the host must emit fully portable KL. All five ports —
-> shen-cl, shen-lua, shen-go, shen-rust and ShenScript — are now verified
-> to produce a byte-identical `kernel.kl` + manifest and portable user KL
-> (see the Gotchas section for the per-host launcher invocation and the
-> `*hush*` caveat). shen-cl remains the reference and the fastest host.
+> compiler, so the host must emit fully portable KL. All six ports —
+> shen-cl, shen-lua, shen-go, shen-rust, ShenScript and shen-julia — are
+> now verified to produce a byte-identical `kernel.kl` + manifest and
+> portable user KL (see the Gotchas section for the per-host launcher
+> invocation and the `*hush*` caveat). shen-cl remains the reference and
+> the fastest host; shen-julia matched it byte-for-byte out of the box (no
+> per-host fix needed).
 
 **See it run:** [`DEMO.md`](DEMO.md) is an executable demo (built with
 [showboat]) that shakes one program and produces a running artifact on all
 five targets; `showboat verify DEMO.md` re-executes every step.
+
+## CLI (`ratatoskr`)
+
+A thin CLI wraps both stages so you don't hand-write the launcher invocation.
+It is packaged as a [uv](https://docs.astral.sh/uv/) tool and bundles the shaker
+source + the kernel KLambda slice, so it runs with **no install**:
+
+```bash
+uvx --from git+https://…/ratatoskr ratatoskr shake prog.shen out/
+uvx --from . ratatoskr targets                 # list stage-2 targets
+ratatoskr build prog.shen out/ --target go     # stage 1 + build a Go artifact
+ratatoskr run   prog.shen out/ --target js     # build, then run it (prints stdout)
+```
+
+| subcommand | does |
+|---|---|
+| `shake PROG OUTDIR` | stage 1 — emit `kernel.kl` + `<prog>.kl` + manifest |
+| `build PROG OUTDIR --target T` | stage 1 + the stage-2 builder for target `T` |
+| `run PROG OUTDIR --target T` | build, then execute the artifact |
+| `targets` | list available targets (`lisp`/`lua`/`go`/`rust`/`js`/`julia`) |
+
+The stage-1 **host** defaults to shen-cl (the reference, and shake output is
+host-independent anyway); override with `--host "<launcher>"` (e.g. `--host
+"node /path/shen.js" --eval-style sub`, or `--eval-style positional` for
+shen-lua). Set the host via `$RATATOSKR_HOST` or `$BIFROST_SHEN_CL`. Stage-2
+builders live in the sibling port repos (`../shen-lua`, `../shen-go`, …),
+overridable per target via `$RATATOSKR_SHEN_*_DIR`; the build/run recipes are
+data in [`builders.json`](builders.json), which [Bifrost](../bifrost)'s
+`--shake` mode reads too.
 
 ## Architecture
 
@@ -60,6 +91,7 @@ repo):
 | Go | `shen-go/cmd/ratatoskr-build <dir> <outdir>` then `go build` | static binary (~4.5 MB, ≤10 ms startup, cross-compiles linux/windows) |
 | Rust | `shen-rust/crates/ratatoskr-build <dir> <outdir>` then `cargo build --release` | static binary (~9 MB, ~40 ms startup) |
 | JavaScript | `node ShenScript/bin/ratatoskr-build.js <dir> <out.js>` (`--linked` for needs-eval) | self-contained ES module (~120 KB, runs on Node 20+ / Bun / Deno 2) |
+| Julia | `julia --project=shen-julia shen-julia/bin/ratatoskr-build.jl <dir> <outdir> [--sysimage]` | artifact project; with `--sysimage` a per-program sysimage (~266 MB, ~0.15 s warm startup), else a lib-mode `.jl` (~4 s, no sysimage). The shaken kernel+user defuns are baked as module methods (same AOT technique as shen-julia's own fast boot). |
 
 **Builder contract**: load `kernel.kl`'s defuns, call `(shen.initialise)`
 (41.2 consolidates all global initialisation there), then run each user
@@ -110,17 +142,19 @@ mode refuses eval-capable manifests).
   `ratatoskr.shen` carries its own `rat.*` versions.
 - Compiled KL carries explicit property-table arguments — e.g. the
   external-symbols registration is a 5-element `put` node, not 4.
-- **Stage 1 runs on all five ports** (verified 2026-06-12 for `fib` and
-  `prolog`: byte-identical `kernel.kl` + manifest against the shen-cl
-  reference, user KL identical modulo gensym numbering). Getting there
-  took one fix per non-shen-cl host, since the user program's KL comes
-  from the host's `bootstrap` (shen→KL) compiler and each had a way of
-  emitting non-portable KL:
+- **Stage 1 runs on all six ports** (verified 2026-06-12 for `fib` and
+  `prolog` on the first five; shen-julia verified 2026-06-19: byte-identical
+  `kernel.kl` + both manifests against the shen-cl reference, user KL identical
+  modulo gensym numbering). Getting there took one fix per non-shen-cl host,
+  since the user program's KL comes from the host's `bootstrap` (shen→KL)
+  compiler and each had a way of emitting non-portable KL (shen-julia was the
+  exception — it matched byte-for-byte with no fix):
   - **shen-cl** — reference host, fastest (~0.06 s): `shen eval -q -l ratatoskr.shen -e '(ratatoskr.shake ["prog.shen"] "out")'`
   - **shen-lua** — `bin/shen ratatoskr.shen -e '(ratatoskr.shake ...)'`. Its native engine compiled `prolog?` to port-local `shen.lua-run-query*` hooks; that expansion is now gated to skip the dynamic extent of `bootstrap`, so compiled `.kl` carries the kernel's portable CPS expansion.
   - **shen-go** — `shen eval -q -l ratatoskr.shen -e '(ratatoskr.shake ...)'`. Gained the standard launcher CLI (`extension-launcher.kl`); the stock binary previously had no `-l`/`-e` and fell straight into the REPL.
   - **shen-rust** — `shen-rust eval -l ratatoskr.shen -e '(ratatoskr.shake ...)'`. Gained the same launcher CLI (on a 1 GB-stack thread for the deep call-graph walk); also fixed `open/2` to honour the `in`/`out` direction symbol so the KL writers truncate-for-write.
   - **ShenScript** — `node bin/shen.js eval -l ratatoskr.shen -e '(ratatoskr.shake ...)'`. The async `read-byte`/file streams left EOF as an unsettled promise, so `read-file-as-bytelist` looped forever (the 50-min hang); file streams are now synchronous and the shake finishes in ~25 s.
+  - **shen-julia** — `shen-julia/bin/shen eval -l ratatoskr.shen -e '(ratatoskr.shake ...)'` (omit `-q`: like shen-lua/shen-rust, `*hush*` would otherwise silence the `pr` writes; a host-side `pr` override makes `*hush*` gate only stdout). Pre-create the output dir (the shake doesn't `mkdir`). Produced byte-identical `kernel.kl` + manifests on the first try — no portability fix needed.
   - **`*hush*` caveat**: `-q` sets `*hush*`, and on **shen-lua and
     shen-rust** that silences the `pr` writes to the output files,
     producing zero-byte artifacts — **omit `-q` on those two**. shen-cl
