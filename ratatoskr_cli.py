@@ -34,6 +34,48 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 RATROOT = HERE  # ratatoskr.shen, KLambda/, builders/, builders.json live here
 BUILDERS_PATH = os.path.join(RATROOT, "builders.json")
 
+IS_WINDOWS = (os.name == "nt")
+
+
+# --------------------------------------------------------------------------
+# Cross-platform helpers (kept in sync with bifrost.py's copies; this tool is
+# packaged separately, so the small duplication keeps it dependency-free).
+# --------------------------------------------------------------------------
+
+def _pathext(env=None):
+    env = os.environ if env is None else env
+    return [e.lower() for e in env.get("PATHEXT", ".COM;.EXE;.BAT;.CMD").split(";") if e.strip()]
+
+
+def find_executable_path(path, is_windows=None, env=None):
+    """The path if it exists, else (Windows) path + each PATHEXT ext, else None."""
+    is_windows = IS_WINDOWS if is_windows is None else is_windows
+    if os.path.exists(path):
+        return path
+    if is_windows:
+        for ext in _pathext(env):
+            if os.path.exists(path + ext):
+                return path + ext
+    return None
+
+
+def wrap_executable(argv, is_windows=None):
+    """Make argv[0] runnable on this platform.
+
+    On Windows: a .bat/.cmd is wrapped in `cmd /c` (CreateProcess can't run
+    batch files directly), and a .sh is wrapped in `sh` (the lisp stage-2
+    builder is a shell script; needs git-bash/WSL/MSYS `sh` on PATH). No-op
+    elsewhere and for native/.exe launchers.
+    """
+    is_windows = IS_WINDOWS if is_windows is None else is_windows
+    if is_windows and argv:
+        low = argv[0].lower()
+        if low.endswith((".bat", ".cmd")):
+            return ["cmd", "/c"] + list(argv)
+        if low.endswith(".sh"):
+            return ["sh"] + list(argv)
+    return list(argv)
+
 
 # --------------------------------------------------------------------------
 # Host (stage-1) resolution
@@ -47,10 +89,14 @@ def default_host():
     """
     for env in ("RATATOSKR_HOST", "BIFROST_SHEN_CL"):
         v = os.environ.get(env)
-        if v and os.path.isfile(v.split()[0]):
-            return v.split()
+        if v:
+            parts = v.split()
+            hit = find_executable_path(parts[0])
+            if hit:
+                return [hit] + parts[1:]
     cand = os.path.abspath(os.path.join(RATROOT, "..", "shen-cl", "bin", "sbcl", "shen"))
-    return [cand] if os.path.isfile(cand) else None
+    hit = find_executable_path(cand)
+    return [hit] if hit else None
 
 
 def shake(prog, outdir, host=None, eval_style="sub", quiet=False):
@@ -82,8 +128,7 @@ def shake(prog, outdir, host=None, eval_style="sub", quiet=False):
     else:
         argv = host + ["eval", "-q", "-l", "ratatoskr.shen", "-e", expr]
 
-    out = None if quiet else None
-    proc = subprocess.run(argv, cwd=RATROOT,
+    proc = subprocess.run(wrap_executable(argv), cwd=RATROOT,
                           stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     text = proc.stdout.decode("utf-8", "replace") if proc.stdout else ""
     kernel = os.path.join(outdir, "kernel.kl")
@@ -148,7 +193,7 @@ def build(target, outdir, tmp=None, quiet=True):
         "{shen_julia}": _sibling_dir("julia", cfg),
     }
     for step in cfg["build"]:
-        argv = [_subst(a, subs) for a in step["argv"]]
+        argv = wrap_executable([_subst(a, subs) for a in step["argv"]])
         cwd = _subst(step["cwd"], subs) if step.get("cwd") else None
         env = dict(os.environ)
         for k, v in step.get("env", {}).items():
@@ -159,7 +204,15 @@ def build(target, outdir, tmp=None, quiet=True):
         if proc.returncode != 0:
             raise SystemExit("ratatoskr: build step failed for target %s: %s"
                              % (target, " ".join(argv)))
-    return [_subst(a, subs) for a in cfg["run"]]
+    run_argv = [_subst(a, subs) for a in cfg["run"]]
+    # A native-exe run path (e.g. {outdir}/app-go-bin) is `app-go-bin.exe` on
+    # Windows; resolve argv[0] to the real file when it's a path (not a PATH
+    # command like `node`/`julia`).
+    if run_argv and (os.sep in run_argv[0] or "/" in run_argv[0]):
+        hit = find_executable_path(run_argv[0])
+        if hit:
+            run_argv[0] = hit
+    return run_argv
 
 
 # --------------------------------------------------------------------------
@@ -219,7 +272,8 @@ def main(argv=None):
         print("built %s artifact; run with:\n  %s" % (args.target, " ".join(run_argv)))
         return 0
     # run
-    proc = subprocess.run(run_argv, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    proc = subprocess.run(wrap_executable(run_argv), stdout=subprocess.PIPE,
+                          stderr=subprocess.STDOUT)
     sys.stdout.write(proc.stdout.decode("utf-8", "replace"))
     return proc.returncode
 
