@@ -63,9 +63,17 @@ overridable per target via `$RATATOSKR_SHEN_*_DIR`; the build/run recipes are
 data in [`builders.json`](builders.json), which [Bifrost](../bifrost)'s
 `--shake` mode reads too.
 
+**Cross-platform.** The CLI is pure-stdlib Python and runs on Linux, macOS and
+Windows. Launcher resolution matches `shen.exe` (PATHEXT) on Windows, and a
+`.bat`/`.cmd` host or a `.sh` builder (the lisp stage-2 `build.sh`) is
+auto-wrapped (`cmd /c` / `sh` — the latter needs git-bash/WSL/MSYS `sh` on
+PATH). The `portability` CI job exercises this on `windows-latest` too. As ever,
+whether a given target's *toolchain* (sbcl/luajit/go/cargo/node/julia) is
+available is your environment's call.
+
 ## Architecture
 
-**Stage 1 — shake** (this repo; run on any of the five ports — see the
+**Stage 1 — shake** (this repo; run on any of the six ports — see the
 host-portability gotcha for per-host launcher syntax):
 
 ```
