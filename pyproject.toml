@@ -4,38 +4,29 @@ build-backend = "hatchling.build"
 
 [project]
 name = "ratatoskr-shen"
-version = "0.1.0"
-description = "Ratatoskr — a tree-shaker for Shen programs (CLI wrapper)"
+version = "0.2.0"
+description = "Ratatoskr — a tree-shaker for Shen programs (Go binary, uvx-installable)"
 readme = "README.md"
 requires-python = ">=3.8"
 license = { text = "BSD-3-Clause" }
 keywords = ["shen", "tree-shaking", "klambda", "compiler"]
-dependencies = []
 
+# uvx path: the wheel build compiles the Go binary on the target machine (needs
+# the Go toolchain) and the console script execs it. No-Go paths:
+# `go install github.com/pyrex41/ratatoskr@latest` and the release binaries.
 [project.scripts]
-ratatoskr = "ratatoskr_cli:main"
+ratatoskr = "ratatoskr_launch:main"
 
-# Ship the wrapper module plus everything ratatoskr.shen needs at runtime: the
-# shaker source, the kernel KLambda slice + callgraph cache, the per-language
-# Primitives, the in-repo builders, and the build recipe table. They install
-# next to the module so HERE-relative resolution finds them after `uvx`.
 [tool.hatch.build.targets.wheel]
-only-include = [
-  "ratatoskr_cli.py",
-  "ratatoskr.shen",
-  "builders.json",
-  "KLambda",
-  "Primitives",
-  "builders",
-]
+packages = ["pybin/ratatoskr_launch"]
+
+[tool.hatch.build.targets.wheel.hooks.custom]
+path = "pybin/hatch_build.py"
 
 [tool.hatch.build.targets.sdist]
+# Ship the Go sources + everything the binary embeds, so the wheel builds from
+# an sdist / git checkout (the gitignored callgraph cache regenerates at runtime).
 include = [
-  "ratatoskr_cli.py",
-  "ratatoskr.shen",
-  "builders.json",
-  "KLambda",
-  "Primitives",
-  "builders",
-  "README.md",
+  "pybin", "go.mod", "*.go", "ratatoskr.shen", "builders.json",
+  "KLambda", "Primitives", "builders", "README.md",
 ]

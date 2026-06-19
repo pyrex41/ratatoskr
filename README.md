@@ -36,16 +36,27 @@ five targets; `showboat verify DEMO.md` re-executes every step.
 
 ## CLI (`ratatoskr`)
 
-A thin CLI wraps both stages so you don't hand-write the launcher invocation.
-It is packaged as a [uv](https://docs.astral.sh/uv/) tool and bundles the shaker
-source + the kernel KLambda slice, so it runs with **no install**:
+A single static **Go binary** wraps both stages so you don't hand-write the
+launcher invocation. It embeds the shaker source + the kernel KLambda slice and
+materialises them to a cache dir on first use, so it runs with no checkout.
+Install it three ways:
 
 ```bash
-uvx --from git+https://…/ratatoskr ratatoskr shake prog.shen out/
-uvx --from . ratatoskr targets                 # list stage-2 targets
+go install github.com/pyrex41/ratatoskr@latest        # Go toolchain
+# or download a prebuilt release binary for your OS/arch (GitHub Releases)
+uvx --from git+https://github.com/pyrex41/ratatoskr ratatoskr targets  # uvx (builds Go locally)
+```
+
+Then:
+
+```bash
+ratatoskr shake prog.shen out/                 # stage 1: emit the KLambda slice
 ratatoskr build prog.shen out/ --target go     # stage 1 + build a Go artifact
 ratatoskr run   prog.shen out/ --target js     # build, then run it (prints stdout)
+ratatoskr targets                              # list stage-2 targets
 ```
+
+(The Python `ratatoskr_cli.py` remains in the repo for reference/dev.)
 
 | subcommand | does |
 |---|---|
