@@ -1,0 +1,86 @@
+{
+  "_comment": [
+    "Stage-2 builder + run recipes for Ratatoskr, one entry per target.",
+    "Faithful to the showboat-verified DEMO.md. Read by both the `ratatoskr`",
+    "CLI (build/run subcommands) and Bifrost's shake-then-run mode.",
+    "",
+    "Placeholders substituted at run time (all absolute paths):",
+    "  {ratroot}   Ratatoskr repo root (holds ratatoskr.shen, KLambda/, builders/)",
+    "  {outdir}    the shake output dir (kernel.kl + <prog>.kl + manifest)",
+    "  {tmp}       a scratch dir for intermediate build tools",
+    "  {shen_lua}/{shen_go}/{shen_rust}/{shenscript}  sibling port repo roots;",
+    "              default to {ratroot}/../<name>, overridable via the env var",
+    "              named in each target's 'dir_env'.",
+    "",
+    "Each target: 'build' is a list of steps (argv + optional cwd/env), run in",
+    "order; 'run' is the argv that executes the built artifact and prints to",
+    "stdout; 'needs' lists external tools that must be on PATH (else SKIP).",
+    "shen-scheme has no Ratatoskr builder yet and is intentionally absent."
+  ],
+
+  "lisp": {
+    "run_impl": "shen-cl",
+    "needs": ["sbcl"],
+    "build": [
+      {"argv": ["{ratroot}/builders/lisp/build.sh", "{outdir}", "{outdir}/app-lisp"],
+       "cwd": "{ratroot}", "env": {"LISP_IMPL": "sbcl"}}
+    ],
+    "run": ["{outdir}/app-lisp"]
+  },
+
+  "lua": {
+    "run_impl": "shen-lua",
+    "dir_env": "RATATOSKR_SHEN_LUA_DIR",
+    "needs": ["luajit"],
+    "build": [
+      {"argv": ["luajit", "{shen_lua}/bin/ratatoskr-build.lua", "{outdir}", "{outdir}/app.lua"]}
+    ],
+    "run": ["luajit", "{outdir}/app.lua"]
+  },
+
+  "go": {
+    "run_impl": "shen-go",
+    "dir_env": "RATATOSKR_SHEN_GO_DIR",
+    "needs": ["go"],
+    "build": [
+      {"argv": ["go", "build", "-o", "{tmp}/ratatoskr-build", "./cmd/ratatoskr-build"],
+       "cwd": "{shen_go}"},
+      {"argv": ["{tmp}/ratatoskr-build", "-shen-go", "{shen_go}", "{outdir}", "{outdir}/app-go"]},
+      {"argv": ["go", "build", "-o", "{outdir}/app-go-bin", "."], "cwd": "{outdir}/app-go"}
+    ],
+    "run": ["{outdir}/app-go-bin"]
+  },
+
+  "rust": {
+    "run_impl": "shen-rust",
+    "dir_env": "RATATOSKR_SHEN_RUST_DIR",
+    "needs": ["cargo"],
+    "build": [
+      {"argv": ["cargo", "run", "-q", "--release", "-p", "ratatoskr-build", "--",
+                "{outdir}", "{outdir}/app-rust"], "cwd": "{shen_rust}"},
+      {"argv": ["cargo", "build", "--release", "-q"], "cwd": "{outdir}/app-rust"}
+    ],
+    "run": ["{outdir}/app-rust/target/release/app-rust"]
+  },
+
+  "js": {
+    "run_impl": "ShenScript",
+    "dir_env": "RATATOSKR_SHENSCRIPT_DIR",
+    "needs": ["node"],
+    "build": [
+      {"argv": ["node", "{shenscript}/bin/ratatoskr-build.js", "{outdir}", "{outdir}/app.js"]}
+    ],
+    "run": ["node", "{outdir}/app.js"]
+  },
+
+  "julia": {
+    "run_impl": "shen-julia",
+    "dir_env": "RATATOSKR_SHEN_JULIA_DIR",
+    "needs": ["julia"],
+    "build": [
+      {"argv": ["julia", "--project={shen_julia}", "{shen_julia}/bin/ratatoskr-build.jl",
+                "{outdir}", "{outdir}/app-julia", "--sysimage"]}
+    ],
+    "run": ["{outdir}/app-julia/run"]
+  }
+}
