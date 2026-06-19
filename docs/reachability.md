@@ -43,40 +43,6 @@ ShenOSKernel 41.1 the per-shake numbers are:
 Beyond the constant-factor pain, the closure computes ~1.27 million
 pairwise answers per shake and then throws away all but one row's worth.
 
-## Why Tarver reached for closure — and why it wasn't a mistake
-
-Read as a shaker, the V³ closure looks like over-engineering: reachability
-from a seed set is O(V + E) with a worklist. But the choice follows from how
-Tarver framed the problem, and the framing is internally coherent.
-
-He did not model "the functions one program reaches." He modelled the *calls
-relation* and materialised its transitive closure as a first-class, named
-artifact — the Function Dependency Graph (`fdg`, held in `*ttable*` as rows
-`[F | everything-F-transitively-calls]`). Given that, the shake is not a
-traversal at all: `footprint` is a union of `assoc` lookups against the table,
-and the entry point reuses an already-bound `*ttable*` instead of recomputing
-it (`(if (bound? *ttable*) (value *ttable*) (fdg))`). A commented-out
-`write-table-to-file` shows he meant to serialise the closure to disk
-(`ttrans.shen`) and ship it.
-
-That is the logician's denotational instinct — native to Shen, a language with
-a built-in Prolog and a sequent-calculus type checker: compute the closure of
-a relation once, store the facts, answer every query by lookup. "Which
-functions does P reach?" becomes "the image of P under `reaches`," and the
-canonical algorithm for the transitive closure of a relation is Warshall. The
-kernel's call structure is port-independent, so in the hub-and-spoke vision the
-FDG is a compute-once-at-the-centre asset every spoke can query — exactly the
-amortisation all-pairs buys.
-
-The irony is that Tarver's own headline architecture argues *against* all-pairs.
-His hub-and-spoke design reduces 14 ports' mutual support from 196 connections
-to 14 — V² → V, the same move as all-pairs closure → single-source
-reachability. The shake wants the spoke, not the full mesh. Warshall was the
-right tool for the object he chose to build (the relation as a queryable
-database) and the wrong tool only for the question the shaker actually asks
-(one program's footprint). At the 34.6-era kernel he targeted the gap was
-immaterial; at 41.2's 1,129 defuns the V³/V² costs are not — which is the whole
-reason Ratatoskr walks the graph instead.
 
 ## What Ratatoskr does instead
 
@@ -177,5 +143,5 @@ Reconsider only if a future feature needs *many-pair* reachability over a
 static graph — e.g. "which functions can reach `error`?" asked for every
 function, or cycle/SCC structure for load ordering. Even then the standard
 answer is Tarjan SCC + condensation (linear time) or per-query traversal,
-not Warshall. Full closure earns its keep only when queries are dense over
+not Warshall. Full closure likely makes sense only when queries are dense over
 the pair space and the graph is small; neither holds here.
