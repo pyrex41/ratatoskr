@@ -1,0 +1,34 @@
+# GoReleaser config — release binaries for the no-Go install path.
+# Cut a release with `git tag v0.2.0 && git push origin v0.2.0`. The binary
+# embeds the shaker + KLambda slice; the gitignored callgraph cache regenerates
+# on first shake. `go install github.com/pyrex41/ratatoskr@latest` and the uvx
+# wheel are the other install paths.
+version: 2
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: ratatoskr
+    main: .
+    binary: ratatoskr
+    env:
+      - CGO_ENABLED=0
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    ldflags:
+      - -s -w
+
+archives:
+  - id: ratatoskr
+    name_template: "ratatoskr_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+
+checksum:
+  name_template: checksums.txt
+
+release:
+  draft: false

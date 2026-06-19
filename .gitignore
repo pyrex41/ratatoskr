@@ -2,3 +2,6 @@ out*/
 tests/*.kl
 KLambda/callgraph-41.2.shen
 *.fasl
+
+# Compiled Go binary bundled into the uvx wheel at build time.
+pybin/*/_bin/
