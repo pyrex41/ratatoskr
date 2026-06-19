@@ -89,17 +89,39 @@ func wrapExecutableFor(argv []string, windows bool) []string {
 	return argv
 }
 
-// ---- materialised root ----
-
-// ratRoot extracts the embedded tree to a versioned cache dir (once) and returns
-// its path. ratatoskr.shen + KLambda must live on disk for the host to load them.
-func ratRoot() (string, error) {
-	shen, err := embedded.ReadFile("ratatoskr.shen")
+// embeddedHash returns a short content hash over the entire embedded tree, so
+// the materialised cache is keyed by exactly what would be extracted.
+func embeddedHash() (string, error) {
+	h := sha256.New()
+	err := fs.WalkDir(embedded, ".", func(p string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		b, err := embedded.ReadFile(p)
+		if err != nil {
+			return err
+		}
+		h.Write([]byte(p))
+		h.Write(b)
+		return nil
+	})
 	if err != nil {
 		return "", err
 	}
-	sum := sha256.Sum256(shen)
-	ver := hex.EncodeToString(sum[:])[:12]
+	return hex.EncodeToString(h.Sum(nil))[:12], nil
+}
+
+// ---- materialised root ----
+
+// ratRoot extracts the embedded tree to a versioned cache dir (once) and returns
+// its path. ratatoskr.shen + KLambda + builders must live on disk for the host
+// and the stage-2 builders. The cache key hashes the WHOLE embedded tree, so any
+// change to the shaker, kernel, or a builder invalidates a stale cache.
+func ratRoot() (string, error) {
+	ver, err := embeddedHash()
+	if err != nil {
+		return "", err
+	}
 	cache, err := os.UserCacheDir()
 	if err != nil || cache == "" {
 		cache = os.TempDir()
@@ -259,7 +281,7 @@ func siblingDir(target string, b builder) string {
 	}
 	name := map[string]string{
 		"lua": "shen-lua", "go": "shen-go", "rust": "shen-rust",
-		"js": "ShenScript", "julia": "shen-julia",
+		"js": "ShenScript", "julia": "shen-julia", "scheme": "shen-scheme",
 	}[target]
 	cwd, _ := os.Getwd()
 	abs, _ := filepath.Abs(filepath.Join(cwd, "..", name))
@@ -304,7 +326,7 @@ func build(target, outdir string) ([]string, error) {
 		"{ratroot}": root, "{outdir}": outdir, "{tmp}": tmp,
 		"{shen_lua}": siblingDir("lua", b), "{shen_go}": siblingDir("go", b),
 		"{shen_rust}": siblingDir("rust", b), "{shenscript}": siblingDir("js", b),
-		"{shen_julia}": siblingDir("julia", b),
+		"{shen_julia}": siblingDir("julia", b), "{shen_scheme}": siblingDir("scheme", b),
 	}
 	for _, st := range b.Build {
 		argv := make([]string, len(st.Argv))
