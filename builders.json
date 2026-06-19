@@ -82,5 +82,16 @@
                 "{outdir}", "{outdir}/app-julia", "--sysimage"]}
     ],
     "run": ["{outdir}/app-julia/run"]
+  },
+
+  "scheme": {
+    "run_impl": "shen-scheme",
+    "dir_env": "RATATOSKR_SHEN_SCHEME_DIR",
+    "needs": ["chez"],
+    "build": [
+      {"argv": ["{ratroot}/builders/scheme/build.sh", "{outdir}", "{outdir}/app-scheme"],
+       "env": {"SHEN_SCHEME": "{shen_scheme}"}}
+    ],
+    "run": ["{outdir}/app-scheme/run"]
   }
 }
