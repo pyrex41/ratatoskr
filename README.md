@@ -64,7 +64,7 @@ ratatoskr targets                              # list stage-2 targets
 | `shake PROG OUTDIR` | stage 1 — emit `kernel.kl` + `<prog>.kl` + manifest |
 | `build PROG OUTDIR --target T` | stage 1 + the stage-2 builder for target `T` |
 | `run PROG OUTDIR --target T` | build, then execute the artifact |
-| `targets` | list available targets (`lisp`/`lua`/`go`/`rust`/`js`/`julia`/`scheme`) |
+| `targets` | list available targets (`lisp`/`lua`/`go`/`rust`/`js`/`julia`/`scheme`/`swift`) |
 
 The stage-1 **host** defaults to shen-cl (the reference, and shake output is
 host-independent anyway); override with `--host "<launcher>"` (e.g. `--host
@@ -80,8 +80,8 @@ Windows. Launcher resolution matches `shen.exe` (PATHEXT) on Windows, and a
 `.bat`/`.cmd` host or a `.sh` builder (the lisp stage-2 `build.sh`) is
 auto-wrapped (`cmd /c` / `sh` — the latter needs git-bash/WSL/MSYS `sh` on
 PATH). The `portability` CI job exercises this on `windows-latest` too. As ever,
-whether a given target's *toolchain* (sbcl/luajit/go/cargo/node/julia) is
-available is your environment's call.
+whether a given target's *toolchain* (sbcl/luajit/go/cargo/node/julia/chez/swift)
+is available is your environment's call.
 
 ## Architecture
 
@@ -119,6 +119,7 @@ repo):
 | JavaScript | `node ShenScript/bin/ratatoskr-build.js <dir> <out.js>` (`--linked` for needs-eval) | self-contained ES module (~120 KB, runs on Node 20+ / Bun / Deno 2) |
 | Julia | `julia --project=shen-julia shen-julia/bin/ratatoskr-build.jl <dir> <outdir> [--sysimage]` | artifact project; with `--sysimage` a per-program sysimage (~266 MB, ~0.15 s warm startup), else a lib-mode `.jl` (~4 s, no sysimage). The shaken kernel+user defuns are baked as module methods (same AOT technique as shen-julia's own fast boot). |
 | Chez Scheme | `builders/scheme/build.sh <dir> <outdir>` (this repo; `SHEN_SCHEME=<checkout>`) | self-contained Scheme program dir + `run` launcher (`chez --script`). The shaken kernel+user are compiled with shen-scheme's own `kl->scheme`; overridden kernel fns (`pr`, `shen.char-stoutput?`, dict ops, …) come from shen-scheme's `overrides.scm`, exactly as its own build does. |
+| Swift | `builders/swift/build.sh <dir> <outdir>` (this repo; `SHEN_SWIFT=<checkout>`) | slice + `run` launcher driving the shen-swift tree-walking interpreter in `--shaken` mode. shen-swift is an *interpreter*, so there is nothing to code-generate (like LuaJIT/Julia it references its runtime); the artifact is the KL slice and the win is boot speed — a ~200-line shaken kernel vs the full ~2500-line kernel. |
 
 **Builder contract**: load `kernel.kl`'s defuns, call `(shen.initialise)`
 (41.2 consolidates all global initialisation there), then run each user

@@ -15,7 +15,8 @@
     "Each target: 'build' is a list of steps (argv + optional cwd/env), run in",
     "order; 'run' is the argv that executes the built artifact and prints to",
     "stdout; 'needs' lists external tools that must be on PATH (else SKIP).",
-    "shen-scheme has no Ratatoskr builder yet and is intentionally absent."
+    "All eight bifrost ports now have a builder: scheme compiles via shen-scheme's",
+    "kl->scheme; swift drives the shen-swift tree-walking interpreter on the slice."
   ],
 
   "lisp": {
@@ -93,5 +94,16 @@
        "env": {"SHEN_SCHEME": "{shen_scheme}"}}
     ],
     "run": ["{outdir}/app-scheme/run"]
+  },
+
+  "swift": {
+    "run_impl": "shen-swift",
+    "dir_env": "RATATOSKR_SHEN_SWIFT_DIR",
+    "needs": ["swift"],
+    "build": [
+      {"argv": ["{ratroot}/builders/swift/build.sh", "{outdir}", "{outdir}/app-swift"],
+       "env": {"SHEN_SWIFT": "{shen_swift}"}}
+    ],
+    "run": ["{outdir}/app-swift/run"]
   }
 }

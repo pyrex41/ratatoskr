@@ -156,7 +156,8 @@ def _sibling_dir(target, cfg):
     if env and os.environ.get(env):
         return os.path.abspath(os.environ[env])
     name = {"lua": "shen-lua", "go": "shen-go", "rust": "shen-rust",
-            "js": "ShenScript", "julia": "shen-julia"}.get(target)
+            "js": "ShenScript", "julia": "shen-julia",
+            "scheme": "shen-scheme", "swift": "shen-swift"}.get(target)
     return os.path.abspath(os.path.join(RATROOT, "..", name)) if name else RATROOT
 
 
@@ -191,6 +192,8 @@ def build(target, outdir, tmp=None, quiet=True):
         "{shen_rust}": _sibling_dir("rust", cfg),
         "{shenscript}": _sibling_dir("js", cfg),
         "{shen_julia}": _sibling_dir("julia", cfg),
+        "{shen_scheme}": _sibling_dir("scheme", cfg),
+        "{shen_swift}": _sibling_dir("swift", cfg),
     }
     for step in cfg["build"]:
         argv = wrap_executable([_subst(a, subs) for a in step["argv"]])
