@@ -12,10 +12,13 @@
 //	shake  PROG OUTDIR             stage 1: emit kernel.kl + <prog>.kl + manifest
 //	build  PROG OUTDIR --target T  stage 1 + stage 2 builder for target T
 //	run    PROG OUTDIR --target T  build, then execute the artifact (prints stdout)
+//	parity PROG OUTDIR             behavioural parity gate: run the shaken slice on
+//	                               every target and diff outputs against a reference
 //	targets                        list available stage-2 targets
 package main
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"embed"
 	"encoding/hex"
@@ -29,6 +32,7 @@ import (
 	"runtime"
 	"sort"
 	"strings"
+	"time"
 )
 
 // Embedded shaker source + kernel slice + per-language primitives + in-repo
@@ -369,7 +373,7 @@ func main() { os.Exit(run(os.Args[1:])) }
 
 func run(args []string) int {
 	if len(args) == 0 {
-		fmt.Fprintln(os.Stderr, "usage: ratatoskr <shake|build|run|targets> ...")
+		fmt.Fprintln(os.Stderr, "usage: ratatoskr <shake|build|run|parity|targets> ...")
 		return 2
 	}
 	cmd, rest := args[0], args[1:]
@@ -392,6 +396,8 @@ func run(args []string) int {
 		return 0
 	case "shake", "build", "run":
 		return cmdStage(cmd, rest)
+	case "parity":
+		return cmdParity(rest)
 	default:
 		fmt.Fprintf(os.Stderr, "ratatoskr: unknown subcommand %q\n", cmd)
 		return 2
@@ -470,6 +476,290 @@ func cmdStage(cmd string, rest []string) int {
 		return 1
 	}
 	return 0
+}
+
+// ---- parity gate ----
+//
+// Byte-identical kernel.kl across hosts is necessary but not sufficient: the
+// SAME KL can still execute differently per target (integer width, symbol
+// interning, hash iteration order, memoisation growth). The parity gate runs a
+// shaken slice through each stage-2 target and checks the rendered output
+// against a reference (and against itself), catching divergence that the
+// byte-identity check cannot. See docs/parity.md and GitHub issue #8.
+
+// passSep is the convention separator: a parity fixture prints two identical
+// passes (the same computation run twice in one process) separated by a line
+// that is exactly "===". splitPasses lets the gate diff the two passes, which
+// catches in-process boot-order / state-dependent nondeterminism.
+const passSep = "==="
+
+// canon normalises line endings and strips trailing blank lines so artifacts
+// that differ only in CRLF or a trailing newline compare equal.
+func canon(s string) string {
+	return strings.TrimRight(strings.ReplaceAll(s, "\r\n", "\n"), "\n")
+}
+
+// splitPasses splits output on the first line equal to passSep, returning the
+// two canonicalised halves. ok is false when the marker is absent (the
+// two-pass check is then reported as N/A, not a failure).
+func splitPasses(out string) (a, b string, ok bool) {
+	lines := strings.Split(strings.ReplaceAll(out, "\r\n", "\n"), "\n")
+	for i, ln := range lines {
+		if strings.TrimSpace(ln) == passSep {
+			return canon(strings.Join(lines[:i], "\n")),
+				canon(strings.Join(lines[i+1:], "\n")), true
+		}
+	}
+	return "", "", false
+}
+
+// firstDiff returns the 1-based number of the first differing line between x
+// and y (already canonicalised by the caller) and the two lines' contents
+// ("" past the end). line is 0 when x == y.
+func firstDiff(x, y string) (line int, xs, ys string) {
+	xl, yl := strings.Split(x, "\n"), strings.Split(y, "\n")
+	n := len(xl)
+	if len(yl) > n {
+		n = len(yl)
+	}
+	at := func(s []string, i int) string {
+		if i < len(s) {
+			return s[i]
+		}
+		return ""
+	}
+	for i := 0; i < n; i++ {
+		if at(xl, i) != at(yl, i) {
+			return i + 1, at(xl, i), at(yl, i)
+		}
+	}
+	return 0, "", ""
+}
+
+// runCapture runs an artifact and returns its stdout (stderr passes through, so
+// runtime errors are visible but never part of the comparison).
+func runCapture(argv []string) (string, int64, error) {
+	a := wrapExecutable(argv)
+	cmd := exec.Command(a[0], a[1:]...)
+	var out bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &out, os.Stderr
+	start := time.Now()
+	err := cmd.Run()
+	return out.String(), time.Since(start).Milliseconds(), err
+}
+
+type parityResult struct {
+	target string
+	status string // ok | skip | builderr | runerr
+	outA   string
+	outB   string
+	runMs  int64
+	err    error
+}
+
+func cmdParity(rest []string) int {
+	fs := flag.NewFlagSet("ratatoskr parity", flag.ContinueOnError)
+	fs.SetOutput(os.Stderr)
+	hostFlag := fs.String("host", "", `stage-1 host launcher (e.g. "node /p/shen.js"); default: shen-cl`)
+	evalStyle := fs.String("eval-style", "sub", "how the host evaluates the shake expr (sub | positional)")
+	targetFlag := fs.String("target", "", "comma-separated targets to check (default: all whose tools are on PATH)")
+	reference := fs.String("reference", "lisp", "reference target whose output is the truth source")
+	expect := fs.String("expect", "", "golden stdout file; when given it is the authoritative truth")
+	timeFlag := fs.Bool("time", false, "report per-target wall-clock (advisory; never fails the gate)")
+	if err := fs.Parse(reorderArgs(rest, "host", "eval-style", "target", "reference", "expect")); err != nil {
+		return 2
+	}
+	if fs.NArg() < 2 {
+		fmt.Fprintln(os.Stderr, "usage: ratatoskr parity PROG OUTDIR [--target a,b] [--reference R] [--expect FILE]")
+		return 2
+	}
+	prog, outdir := fs.Arg(0), fs.Arg(1)
+	var host []string
+	if *hostFlag != "" {
+		host = strings.Fields(*hostFlag)
+		if hit := findExecutablePath(host[0]); hit != "" {
+			host[0] = hit
+		}
+	}
+
+	builders, err := loadBuilders()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "ratatoskr:", err)
+		return 1
+	}
+
+	// Selected targets: explicit list, or every known target.
+	var targets []string
+	if *targetFlag != "" {
+		for _, t := range strings.Split(*targetFlag, ",") {
+			t = strings.TrimSpace(t)
+			if t == "" {
+				continue
+			}
+			if _, ok := builders[t]; !ok {
+				fmt.Fprintf(os.Stderr, "ratatoskr: unknown target %q\n", t)
+				return 2
+			}
+			targets = append(targets, t)
+		}
+	} else {
+		for t := range builders {
+			targets = append(targets, t)
+		}
+	}
+	sort.Strings(targets)
+	// Without a golden, the reference target must be built to supply the truth.
+	if *expect == "" && !contains(targets, *reference) {
+		if _, ok := builders[*reference]; !ok {
+			fmt.Fprintf(os.Stderr, "ratatoskr: unknown reference target %q\n", *reference)
+			return 2
+		}
+		targets = append([]string{*reference}, targets...)
+	}
+
+	// Stage 1, once.
+	if _, err := shake(prog, outdir, host, *evalStyle, true); err != nil {
+		fmt.Fprintln(os.Stderr, "ratatoskr:", err)
+		return 1
+	}
+	outdir, _ = filepath.Abs(outdir)
+
+	// Build + run each target twice (two boots), in deterministic order.
+	results := map[string]*parityResult{}
+	for _, t := range targets {
+		r := &parityResult{target: t}
+		results[t] = r
+		runArgv, berr := build(t, outdir)
+		if berr != nil {
+			r.status, r.err = "builderr", berr
+			continue
+		}
+		if runArgv == nil {
+			r.status = "skip"
+			continue
+		}
+		outA, ms, ea := runCapture(runArgv)
+		outB, _, eb := runCapture(runArgv)
+		r.outA, r.outB, r.runMs = outA, outB, ms
+		if ea != nil || eb != nil {
+			r.status = "runerr"
+			if ea != nil {
+				r.err = ea
+			} else {
+				r.err = eb
+			}
+			continue
+		}
+		r.status = "ok"
+	}
+
+	// Establish the truth output.
+	var truth, truthSrc string
+	if *expect != "" {
+		b, err := os.ReadFile(*expect)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "ratatoskr: cannot read --expect file:", err)
+			return 1
+		}
+		truth, truthSrc = canon(string(b)), "expect:"+filepath.Base(*expect)
+	} else {
+		ref := results[*reference]
+		if ref == nil || ref.status != "ok" {
+			fmt.Fprintf(os.Stderr, "ratatoskr: cannot establish a reference: target %q is %s "+
+				"(install its toolchain or pass --expect FILE)\n", *reference,
+				statusOr(ref, "unavailable"))
+			return 1
+		}
+		truth, truthSrc = canon(ref.outA), "reference:"+*reference
+	}
+
+	// Report.
+	fmt.Printf("parity gate: %s  (truth = %s)\n", filepath.Base(prog), truthSrc)
+	fmt.Printf("%-8s %-6s %-9s %-9s %-8s\n", "target", "build", "vs-truth", "two-boot", "two-pass")
+	fail := false
+	checked := 0
+	for _, t := range targets {
+		r := results[t]
+		switch r.status {
+		case "skip":
+			fmt.Printf("%-8s %-6s %s\n", t, "SKIP", "(toolchain not on PATH)")
+			continue
+		case "builderr":
+			fmt.Printf("%-8s %-6s build failed: %v\n", t, "FAIL", r.err)
+			fail = true
+			continue
+		case "runerr":
+			fmt.Printf("%-8s %-6s run failed: %v\n", t, "FAIL", r.err)
+			fail = true
+			continue
+		}
+		checked++
+		a := canon(r.outA)
+		vsTruth := a == truth
+		twoBoot := a == canon(r.outB)
+		p1, p2, hasPasses := splitPasses(r.outA)
+		twoPass := !hasPasses || p1 == p2
+		tp := "N/A"
+		if hasPasses {
+			if twoPass {
+				tp = "ok"
+			} else {
+				tp = "DIFFER"
+			}
+		}
+		mark := func(b bool) string {
+			if b {
+				return "ok"
+			}
+			return "DIFFER"
+		}
+		extra := ""
+		if *timeFlag {
+			extra = fmt.Sprintf("  %dms", r.runMs)
+		}
+		fmt.Printf("%-8s %-6s %-9s %-9s %-8s%s\n", t, "ok", mark(vsTruth), mark(twoBoot), tp, extra)
+		if !vsTruth {
+			ln, xs, ys := firstDiff(a, truth)
+			fmt.Printf("    vs-truth first diff @ line %d:\n      got:  %q\n      want: %q\n", ln, xs, ys)
+		}
+		if !twoBoot {
+			ln, xs, ys := firstDiff(a, canon(r.outB))
+			fmt.Printf("    two-boot first diff @ line %d:\n      bootA: %q\n      bootB: %q\n", ln, xs, ys)
+		}
+		if hasPasses && !twoPass {
+			ln, xs, ys := firstDiff(p1, p2)
+			fmt.Printf("    two-pass first diff @ line %d:\n      pass1: %q\n      pass2: %q\n", ln, xs, ys)
+		}
+		if !(vsTruth && twoBoot && twoPass) {
+			fail = true
+		}
+	}
+	if fail {
+		fmt.Println("parity: FAIL")
+		return 1
+	}
+	if checked == 0 {
+		fmt.Println("parity: no targets checked (toolchains missing)")
+		return 3
+	}
+	fmt.Printf("parity: PASS (%d target(s) checked)\n", checked)
+	return 0
+}
+
+func contains(xs []string, x string) bool {
+	for _, e := range xs {
+		if e == x {
+			return true
+		}
+	}
+	return false
+}
+
+func statusOr(r *parityResult, dflt string) string {
+	if r == nil {
+		return dflt
+	}
+	return r.status
 }
 
 func ifTarget(cmd string) string {
