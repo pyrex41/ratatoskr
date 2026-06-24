@@ -54,16 +54,16 @@ Then:
 ratatoskr shake prog.shen out/                 # stage 1: emit the KLambda slice
 ratatoskr build prog.shen out/ --target go     # stage 1 + build a Go artifact
 ratatoskr run   prog.shen out/ --target js     # build, then run it (prints stdout)
+ratatoskr parity prog.shen out/                # behavioural parity gate across targets
 ratatoskr targets                              # list stage-2 targets
 ```
-
-(The Python `ratatoskr_cli.py` remains in the repo for reference/dev.)
 
 | subcommand | does |
 |---|---|
 | `shake PROG OUTDIR` | stage 1 — emit `kernel.kl` + `<prog>.kl` + manifest |
 | `build PROG OUTDIR --target T` | stage 1 + the stage-2 builder for target `T` |
 | `run PROG OUTDIR --target T` | build, then execute the artifact |
+| `parity PROG OUTDIR` | run the shaken slice on every target and diff outputs against a reference — see [Behavioural parity gate](#behavioural-parity-gate) |
 | `targets` | list available targets (`lisp`/`lua`/`go`/`rust`/`js`/`julia`/`scheme`/`swift`) |
 
 The stage-1 **host** defaults to shen-cl (the reference, and shake output is
@@ -75,11 +75,12 @@ overridable per target via `$RATATOSKR_SHEN_*_DIR`; the build/run recipes are
 data in [`builders.json`](builders.json), which [Bifrost](../bifrost)'s
 `--shake` mode reads too.
 
-**Cross-platform.** The CLI is pure-stdlib Python and runs on Linux, macOS and
-Windows. Launcher resolution matches `shen.exe` (PATHEXT) on Windows, and a
+**Cross-platform.** The CLI is a single static Go binary and runs on Linux, macOS
+and Windows. Launcher resolution matches `shen.exe` (PATHEXT) on Windows, and a
 `.bat`/`.cmd` host or a `.sh` builder (the lisp stage-2 `build.sh`) is
 auto-wrapped (`cmd /c` / `sh` — the latter needs git-bash/WSL/MSYS `sh` on
-PATH). The `portability` CI job exercises this on `windows-latest` too. As ever,
+PATH). The `go` CI job builds and tests the binary — including these helpers and
+the embedded `builders.json` — on `ubuntu`/`macos`/`windows-latest`. As ever,
 whether a given target's *toolchain* (sbcl/luajit/go/cargo/node/julia/chez/swift)
 is available is your environment's call.
 
@@ -199,9 +200,35 @@ mode refuses eval-capable manifests).
 outputs `hello from shaken shen`, `fib 20 = 6765`,
 `mary likes chocolate: true`, and three lines of `eval ...: 42`
 (metaeval is the eval-capable fixture: `needs-eval=true`, ~568 kernel
-defuns).
+defuns). `tests/parity.shen` (+ `tests/parity.expected`) is the
+behavioural-parity fixture — see below.
 Every stage-1 change should be verified through at least one stage-2
 builder (the Lua one is fastest).
+
+### Behavioural parity gate
+
+Byte-identical KL across hosts is necessary but **not sufficient**: the same KL
+can still *execute* differently per target (integer width, symbol interning,
+hash iteration order, memoisation), so a slice can pass every byte-identity check
+and still return wrong, boot-order-dependent answers on one target — the failure
+shen-cas hit on shen-rust ([issue #8](https://github.com/pyrex41/ratatoskr/issues/8)).
+
+`ratatoskr parity PROG OUTDIR` closes that gap: it shakes once, then runs the
+slice through each stage-2 target and diffs the rendered output against a
+reference (`--reference`, default `lisp`) or a committed golden (`--expect FILE`).
+Each artifact is run twice as separate processes, and a fixture that prints two
+identical passes separated by a line that is exactly `===` is additionally
+checked for in-process determinism (pass 1 == pass 2) — catching boot-order
+nondeterminism within a single run. See [`docs/parity.md`](docs/parity.md).
+
+```bash
+ratatoskr parity tests/parity.shen out/ --expect tests/parity.expected
+# parity gate: parity.shen  (truth = expect:parity.expected)
+# target   build  vs-truth  two-boot  two-pass
+# lua      ok     ok        ok        ok
+# js       ok     ok        ok        ok
+# parity: PASS (2 target(s) checked)
+```
 
 The Lisp builder is verified on SBCL, GNU CLISP and ECL (`LISP_IMPL=`).
 CCL is unsupported: no native Apple Silicon build exists. Implementation
