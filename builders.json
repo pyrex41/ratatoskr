@@ -8,7 +8,8 @@
     "  {ratroot}   Ratatoskr repo root (holds ratatoskr.shen, KLambda/, builders/)",
     "  {outdir}    the shake output dir (kernel.kl + <prog>.kl + manifest)",
     "  {tmp}       a scratch dir for intermediate build tools",
-    "  {shen_lua}/{shen_go}/{shen_rust}/{shenscript}  sibling port repo roots;",
+    "  {shen_lua}/{shen_go}/{shen_rust}/{shenscript}/{shen_julia}/{shen_scheme}/",
+    "  {shen_swift}/{shen_cl}                          sibling port repo roots;",
     "              default to {ratroot}/../<name>, overridable via the env var",
     "              named in each target's 'dir_env'.",
     "",
@@ -21,10 +22,11 @@
 
   "lisp": {
     "run_impl": "shen-cl",
+    "dir_env": "RATATOSKR_SHEN_CL_DIR",
     "needs": ["sbcl"],
     "build": [
       {"argv": ["{ratroot}/builders/lisp/build.sh", "{outdir}", "{outdir}/app-lisp"],
-       "cwd": "{ratroot}", "env": {"LISP_IMPL": "sbcl"}}
+       "cwd": "{ratroot}", "env": {"LISP_IMPL": "sbcl", "SHEN_CL": "{shen_cl}"}}
     ],
     "run": ["{outdir}/app-lisp"]
   },
