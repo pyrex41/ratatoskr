@@ -1,23 +1,23 @@
 # Ratatoskr
 
-> **Branch status — S41.2-refresh lineage switch.** This branch retargets
-> the shaker from the community ShenOSKernel-41.2 packaging to Mark
+> **Kernel lineage — S41.2 refresh (merged).** The shaker targets Mark
 > Tarver's **refreshed S41.2** kernel (shenlanguage.org, re-uploaded
 > 2026-07-11; canonical mirror `pyrex41/shen-s41.1`, tag
-> `s41.2-pristine-20260711`). The refreshed kernel has no
+> `s41.2-pristine-20260711`), a lineage switch from the community
+> ShenOSKernel-41.2 packaging. The refreshed kernel has no
 > `shen.initialise` (init is toplevel forms, wrapped into a synthetic
 > initialiser at shake time), no dict layer (property vector instead),
-> and a leaner surface: 683 boot defuns vs 1,152. Stage 1 plus the lua,
-> rust and go targets are green against their own
-> `kernel/tarver-s41-refresh-20260711` branches (all four fixtures;
-> eval-free `fib` shakes to **54 defuns / 13.4 KB**, metaeval to 548).
-> Known red, tracked for its per-port migration: ShenScript's native
-> `put`/`get` are dict-typed and reject the property vector (breaks all
-> slices on js). Everything below the fold still describes the
-> community-41.2 state where it disagrees.
+> and a leaner surface: 683 boot defuns vs 1,152. The lua, rust, go and
+> js targets are green on their migrated ports (all four fixtures;
+> eval-free `fib` shakes to **54 defuns / 13.4 KB**, metaeval to 548;
+> four-target parity gate PASS). The reference stage-1 host is shen-cl
+> built from its refreshed master (same lineage); a community-41.2
+> shen-cl binary is a verified-working alternative — both produce
+> byte-identical `kernel.kl` + manifest on every fixture. Prose below
+> that predates the refresh is being updated as sections are touched.
 
 A tree-shaker for [Shen](https://shenlanguage.org) programs, targeting
-ShenOSKernel **41.2**. Descended from Mark Tarver's **Yggdrasil 1.0**
+Tarver's refreshed **S41.2** kernel. Descended from Mark Tarver's **Yggdrasil 1.0**
 (3-clause BSD) — in the myth, Ratatoskr is the squirrel that runs the
 trunk of Yggdrasil, carrying messages between crown and roots; here it
 walks the kernel call graph and carries a minimal slice of the tree to
@@ -31,7 +31,7 @@ repository started from is archived in [`archive/`](archive/) along with the
 it was retrieved from.
 
 Ratatoskr turns a Shen program into a minimal, standalone artifact in a
-target language: it computes which of the kernel's 1129 functions the
+target language: it computes which of the kernel's 683 functions the
 program can actually reach, emits just that slice as KLambda, and hands the
 result to a per-target builder that compiles it with the target port's own
 KL compiler.
@@ -82,10 +82,16 @@ ratatoskr targets                              # list stage-2 targets
 | `parity PROG OUTDIR` | run the shaken slice on every target and diff outputs against a reference — see [Behavioural parity gate](#behavioural-parity-gate) |
 | `targets` | list available targets (`lisp`/`lua`/`go`/`rust`/`js`/`julia`/`scheme`/`swift`) |
 
-The stage-1 **host** defaults to shen-cl (the reference, and shake output is
-host-independent anyway); override with `--host "<launcher>"` (e.g. `--host
-"node /path/shen.js" --eval-style sub`, or `--eval-style positional` for
-shen-lua). Set the host via `$RATATOSKR_HOST` or `$BIFROST_SHEN_CL`. Stage-2
+The stage-1 **host** defaults to the sibling `../shen-cl/bin/sbcl/shen`
+binary, used as-is. The reference is shen-cl built from its S41.2-refresh
+master (same lineage as the vendored kernel); an older community-41.2
+binary at that path also works — the two are verified to produce
+byte-identical `kernel.kl` + manifest on every fixture (user KL differs
+only in gensym numbering), so a stale sibling build is a correctness
+no-op. Rebuild shen-cl from master to refresh the host. Override with
+`--host "<launcher>"` (e.g. `--host "node /path/shen.js" --eval-style
+sub`, or `--eval-style positional` for shen-lua), or set `$RATATOSKR_HOST`
+or `$BIFROST_SHEN_CL`. Stage-2
 builders live in the sibling port repos (`../shen-lua`, `../shen-go`, …),
 overridable per target via `$RATATOSKR_SHEN_*_DIR`; the build/run recipes are
 data in [`builders.json`](builders.json), which [Bifrost](../bifrost)'s
