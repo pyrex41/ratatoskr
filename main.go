@@ -168,7 +168,12 @@ func ratRoot() (string, error) {
 
 // ---- host (stage 1) ----
 
-// defaultHost resolves the stage-1 host launcher argv, or nil.
+// defaultHost resolves the stage-1 host launcher argv, or nil. The sibling
+// ../shen-cl/bin/sbcl/shen is used as-is: whatever binary is built there is
+// the host. After the S41.2-refresh migration the reference host is a
+// shen-cl built from its refreshed master; an older community-41.2 binary
+// at that path still works (both produce byte-identical stage-1 output) —
+// rebuild shen-cl master to refresh the host. Override with $RATATOSKR_HOST.
 func defaultHost() []string {
 	for _, env := range []string{"RATATOSKR_HOST", "BIFROST_SHEN_CL"} {
 		if v := os.Getenv(env); v != "" {

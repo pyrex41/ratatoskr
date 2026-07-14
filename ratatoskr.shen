@@ -5,11 +5,15 @@
 \\ kernel (shenlanguage.org, re-uploaded 2026-07-11).
 \\
 \\ Stage 1 (this file): shake a program against that kernel and emit
-\\ minimal KL + a manifest.  Pure Shen against the certified kernel API;
-\\ run it on shen-cl - the user KL comes from the host's bootstrap
-\\ compiler, and other hosts may emit port-internal hooks (see README,
-\\ host-portability gotcha).  Stage 2 (per target, lives in each port
-\\ repo): compile the shaken KL with the port's own KL->native compiler.
+\\ minimal KL + a manifest.  Pure Shen against the certified kernel API.
+\\ The reference host is shen-cl built from its S41.2-refresh master -
+\\ same lineage as the vendored kernel.  A community-41.2 shen-cl is a
+\\ verified-working alternative: both hosts produce byte-identical
+\\ kernel.kl + manifest on all fixtures (user KL differs only in gensym
+\\ numbering).  Other hosts may emit port-internal hooks from their
+\\ bootstrap compiler (see README, host-portability gotcha).  Stage 2
+\\ (per target, lives in each port repo): compile the shaken KL with the
+\\ port's own KL->native compiler.
 \\
 \\ (ratatoskr.shake ["prog.shen"] "out") writes to out/:
 \\    kernel.kl                shaken kernel defuns, in load order
@@ -188,7 +192,7 @@
 \\ ====================== kernel call graph (cached) ======================
 \\ The original Yggdrasil computed a full transitive closure with Warshall's
 \\ algorithm - O(N^3) over every kernel symbol, which does not scale to the
-\\ 41.2 kernel (1129 defuns, ~700K of KL).  We only ever need reachability
+\\ 41.2 kernel (683 defuns, ~280K of KL).  We only ever need reachability
 \\ from a seed set, so build the direct call graph once (cached to disk)
 \\ and run a worklist traversal over it per shake.  Full rationale,
 \\ including why a faster external closure (Julia/bitsets) is still the
@@ -291,7 +295,7 @@
   _ -> [])
 
 \\ defp is a build-time-only membership test: called-fns visits every
-\\ symbol leaf of ~700K of KL, where (element? F Fs) over 1129 names
+\\ symbol leaf of ~280K of KL, where (element? F Fs) over 683 names
 \\ would cost ~45M comparisons.  Never consulted per-shake.
 (define kernel-defun?
   F -> (trap-error (get F defp) (/. E false)))
@@ -343,7 +347,7 @@
 \\
 \\ Cost is the reason it is not the default: O(V^3) over a V*V boolean
 \\ matrix.  Fine on the small graphs of the test fixtures; impractical on the
-\\ full 1129-node kernel (see docs/reachability.md).  Enable per run with
+\\ full 683-node kernel (see docs/reachability.md).  Enable per run with
 \\ (set *use-warshall* true).
 \\
 \\ One correction over the 1.0 original: each seed is unioned into its own

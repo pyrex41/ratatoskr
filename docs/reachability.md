@@ -30,17 +30,17 @@ once and persisted — `fdg` reuses an already-bound `*ttable*`, and there is
 a `write-table-to-file`/`ttrans.shen` writer — but that writer is commented
 out and the `array`/`:=`/`for` DSL it needs never shipped, so it is doubtful
 the closure was ever successfully run at full kernel scale. Against
-ShenOSKernel 41.1 the per-shake numbers are:
+Tarver's refreshed S41.2 kernel the per-shake numbers are:
 
-| | 41.1 numbers |
+| | S41.2-refresh numbers |
 |---|---|
-| Kernel defuns (V) | 1,129 |
-| Call edges (E) | 5,619 (≈ 5 per node — very sparse) |
-| Kernel KL source | ~700 KB |
-| Warshall closure | V³ ≈ 1.44 × 10⁹ ops, plus a V×V matrix |
-| Worklist reachability | O(V + E) ≈ 6.7 × 10³ graph ops per shake |
+| Kernel defuns (V) | 683 (S41.2 refresh) |
+| Call edges (E) | 2,568 (≈ 4 per node — very sparse) |
+| Kernel KL source | ~280 KB |
+| Warshall closure | V³ ≈ 3.2 × 10⁸ ops, plus a V×V matrix |
+| Worklist reachability | O(V + E) ≈ 3.3 × 10³ graph ops per shake |
 
-Beyond the constant-factor pain, the closure computes ~1.27 million
+Beyond the constant-factor pain, the closure computes ~466 thousand
 pairwise answers per shake and then throws away all but one row's worth.
 
 
@@ -48,8 +48,8 @@ pairwise answers per shake and then throws away all but one row's worth.
 
 1. **Build the direct call graph once** (`build-call-graph`): for each
    `defun`, record which kernel-defined names appear in its body. This is
-   the only expensive pass (it walks every symbol leaf of ~700 KB of KL),
-   so it is cached to disk (`KLambda/callgraph-41.1.shen`) and reloaded on
+   the only expensive pass (it walks every symbol leaf of ~280 KB of KL),
+   so it is cached to disk (`KLambda/callgraph-s41r-20260711.shen`) and reloaded on
    subsequent shakes. The cache is keyed to the kernel version, which only
    changes when the kernel does.
 2. **Per shake, traverse from the seeds** (`footprint` / `reach`): a pure
@@ -87,11 +87,11 @@ down to O(V³/w) ≈ 2.2 × 10⁷ word ops. Objections, in order of importance:
    portable: shen-lua as host reproduces `kernel.kl` byte-for-byte.)
    Adding a Julia (or C, or anything) sidecar for graph math breaks the
    one property the tool exists to provide. There is no performance
-   problem to justify it: per-shake reachability over 1,129 nodes is
+   problem to justify it: per-shake reachability over 683 nodes is
    milliseconds in pure Shen.
 3. **The actual bottleneck was never the traversal.** Profiling during the
    41.1 retarget showed the cost is in *building* the graph (one walk of
-   700 KB of KL — solved by the disk cache and the `defp` property-list
+   280 KB of KL — solved by the disk cache and the `defp` property-list
    membership test) and in reading/writing KL files. Speeding up the
    per-shake traversal optimizes a rounding error.
 
