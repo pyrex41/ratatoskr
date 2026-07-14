@@ -223,9 +223,15 @@
 (define call-graph
   Code -> (trap-error (load-call-graph) (/. E (build-call-graph Code))))
 
+\\ Loading the cache must also restore the defp marks: called-fns is used
+\\ per shake on the kernel's toplevel init forms (seed collection), and
+\\ kernel-defun? consults defp.  Without this, a cache-hit shake seeds
+\\ nothing from the init forms and silently under-shakes (caught by the
+\\ rust boot in the parity gate: "undefined function: vector").
 (define load-call-graph
   -> (let Bytes (read-file-as-bytelist (value *callgraph-cache*))
           Rows  (parse-graph Bytes "" [] [])
+          Mark  (rat.mapc (/. Row (put (hd Row) defp true)) Rows)
           (if (empty? Rows) (error "empty call graph cache~%") Rows)))
 
 \\ parse-graph Bytes Token Row Rows: accumulate chars into Token, tokens

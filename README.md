@@ -7,15 +7,14 @@
 > `s41.2-pristine-20260711`). The refreshed kernel has no
 > `shen.initialise` (init is toplevel forms, wrapped into a synthetic
 > initialiser at shake time), no dict layer (property vector instead),
-> and a leaner surface: 683 boot defuns vs 1,152. Stage 1 and the lua
-> target are green (`fib`/`hello`/`prolog`/`parity` fixtures; eval-free
-> `fib` shakes to **54 defuns / 13.4 KB**, metaeval to 306). Known reds,
-> tracked for the per-port migrations: shen-lua's runtime `eval-kl`
-> define-path calls the community hook `shen.set-lambda-form-entry`
-> (breaks metaeval on lua); ShenScript's native `put`/`get` are
-> dict-typed and reject the property vector (breaks all slices on js).
-> Everything below the fold still describes the community-41.2 state
-> where it disagrees.
+> and a leaner surface: 683 boot defuns vs 1,152. Stage 1 plus the lua,
+> rust and go targets are green against their own
+> `kernel/tarver-s41-refresh-20260711` branches (all four fixtures;
+> eval-free `fib` shakes to **54 defuns / 13.4 KB**, metaeval to 548).
+> Known red, tracked for its per-port migration: ShenScript's native
+> `put`/`get` are dict-typed and reject the property vector (breaks all
+> slices on js). Everything below the fold still describes the
+> community-41.2 state where it disagrees.
 
 A tree-shaker for [Shen](https://shenlanguage.org) programs, targeting
 ShenOSKernel **41.2**. Descended from Mark Tarver's **Yggdrasil 1.0**
