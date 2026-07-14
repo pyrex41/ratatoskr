@@ -3,7 +3,7 @@
 The `.kl` files in this directory are Mark Tarver's **refreshed S41.2**
 kernel, vendored byte-for-byte from the canonical mirror of his uploads:
 
-- **Canonical source:** `pyrex41/shen-s41.1`, tag
+- **Canonical source:** `pyrex41/shen-upstream`, tag
   `s41.2-pristine-20260711` (commit `11fc51b`), files `KLambda/*.kl`.
   Verified byte-identical here with `cmp` at vendoring time.
 - **Upstream origin:** <https://www.shenlanguage.org/Download/S41.2.zip>,

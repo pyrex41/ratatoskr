@@ -2,7 +2,7 @@
 
 > **Kernel lineage — S41.2 refresh (merged).** The shaker targets Mark
 > Tarver's **refreshed S41.2** kernel (shenlanguage.org, re-uploaded
-> 2026-07-11; canonical mirror `pyrex41/shen-s41.1`, tag
+> 2026-07-11; canonical mirror `pyrex41/shen-upstream`, tag
 > `s41.2-pristine-20260711`), a lineage switch from the community
 > ShenOSKernel-41.2 packaging. The refreshed kernel has no
 > `shen.initialise` (init is toplevel forms, wrapped into a synthetic
