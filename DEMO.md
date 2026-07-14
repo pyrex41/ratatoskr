@@ -3,7 +3,7 @@
 *2026-06-11T22:53:26Z by Showboat 0.6.1*
 <!-- showboat-id: f13bb21e-fd4c-4bea-b91b-3c2b524ba3d8 -->
 
-[Ratatoskr](README.md) tree-shakes a [Shen](https://shenlanguage.org) program against the ShenOSKernel-41.2 and emits the minimal KLambda slice plus a manifest; per-target builders in the sibling port repos then compile that slice with each port's own KL compiler. This demo shakes one program and produces a running artifact on **Common Lisp (SBCL), LuaJIT, Rust, Go, and JavaScript (Node)**.
+[Ratatoskr](README.md) tree-shakes a [Shen](https://shenlanguage.org) program against Mark Tarver’s refreshed S41.2 kernel (canonical mirror `pyrex41/shen-upstream`) and emits the minimal KLambda slice plus a manifest; per-target builders in the sibling port repos then compile that slice with each port's own KL compiler. This demo shakes one program and produces a running artifact on **Common Lisp (SBCL), LuaJIT, Rust, Go, and JavaScript (Node)**.
 
 Assumptions: sibling checkouts `../shen-cl` (with a built `bin/sbcl/shen`), `../shen-lua`, `../shen-rust`, `../shen-go`, `../ShenScript`, and `sbcl`, `luajit`, `cargo`, `go`, `node` on PATH. Run from the Ratatoskr repo root.
 
@@ -25,7 +25,7 @@ cat tests/fib.shen
 
 ## Stage 1 — shake
 
-`ratatoskr.shake` computes the program's reachable slice of the kernel's 1129 functions. fib never evaluates Shen at runtime, so eval-stripping kicks in: the macro expander, typechecker, reader and `eval` all fall away, leaving ~100 kernel functions.
+`ratatoskr.shake` computes the program's reachable slice of the kernel's 683 functions. fib never evaluates Shen at runtime, so eval-stripping kicks in: the macro expander, typechecker, reader and `eval` all fall away, leaving ~54 kernel functions.
 
 ```bash
 rm -rf out-demo && mkdir -p out-demo && ../shen-cl/bin/sbcl/shen eval -q -l ratatoskr.shen -e "(ratatoskr.shake [\"tests/fib.shen\"] \"out-demo\")" | tail -1 && ls out-demo
@@ -44,15 +44,15 @@ grep -c "(defun" out-demo/kernel.kl && grep -E "manifest-version|kernel-version|
 ```
 
 ```output
-102
+54
 manifest-version=2
-kernel-version=41.2
+kernel-version=41.2-s41r.20260711
 user=fib.kl
 fn=fib 1
 needs-eval=false
 ```
 
-102 kernel defuns (of 1129) plus the user code, with the contract a builder needs: load `kernel.kl`, call `(shen.initialise)`, run the user forms in order.
+54 kernel defuns (of 683, including the synthesised `shen.initialise`) plus the user code, with the contract a builder needs: load `kernel.kl`, call `(shen.initialise)`, run the user forms in order.
 
 ## Stage 2 — Common Lisp (SBCL)
 
@@ -137,7 +137,7 @@ One 7-line Shen program, one shake, five independently-runnable artifacts:
 | Go | `out-demo/fib-go-bin` (+ a linux/amd64 cross-build) | static native executable |
 | JavaScript | `out-demo/fib.js` | `node fib.js` (also `bun` / `deno run`) |
 
-All five printed `fib 20 = 6765` from a kernel slice of 102 functions — the other 1027 were shaken away. Re-execute this document with `showboat verify DEMO.md`.
+All five printed `fib 20 = 6765` from a kernel slice of 54 functions — the other 629 were shaken away. Re-execute this document with `showboat verify DEMO.md`.
 
 ```bash
 ls out-demo/fib-lisp out-demo/fib.lua out-demo/fib-rust/target/release/fib-rust out-demo/fib-go-bin out-demo/fib-go-linux out-demo/fib.js
