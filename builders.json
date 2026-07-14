@@ -107,5 +107,15 @@
        "env": {"SHEN_SWIFT": "{shen_swift}"}}
     ],
     "run": ["{outdir}/app-swift/run"]
+  },
+
+  "hvm": {
+    "run_impl": "shen-inets",
+    "dir_env": "RATATOSKR_SHEN_INETS_DIR",
+    "needs": ["python3", "hvm"],
+    "build": [
+      {"argv": ["python3", "{shen_inets}/build_shake.py", "{outdir}", "{outdir}/app.hvml"]}
+    ],
+    "run": ["hvm", "run", "{outdir}/app.hvml"]
   }
 }

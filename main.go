@@ -291,7 +291,7 @@ func siblingDir(target string, b builder) string {
 	name := map[string]string{
 		"lua": "shen-lua", "go": "shen-go", "rust": "shen-rust",
 		"js": "ShenScript", "julia": "shen-julia", "scheme": "shen-scheme",
-		"swift": "shen-swift", "lisp": "shen-cl",
+		"swift": "shen-swift", "lisp": "shen-cl", "hvm": "inets/shen-inets",
 	}[target]
 	cwd, _ := os.Getwd()
 	abs, _ := filepath.Abs(filepath.Join(cwd, "..", name))
@@ -338,6 +338,7 @@ func build(target, outdir string) ([]string, error) {
 		"{shen_rust}": siblingDir("rust", b), "{shenscript}": siblingDir("js", b),
 		"{shen_julia}": siblingDir("julia", b), "{shen_scheme}": siblingDir("scheme", b),
 		"{shen_swift}": siblingDir("swift", b), "{shen_cl}": siblingDir("lisp", b),
+		"{shen_inets}": siblingDir("hvm", b),
 	}
 	for _, st := range b.Build {
 		argv := make([]string, len(st.Argv))
