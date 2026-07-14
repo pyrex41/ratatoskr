@@ -1,5 +1,21 @@
 # Ratatoskr
 
+> **Branch status — S41.2-refresh lineage switch.** This branch retargets
+> the shaker from the community ShenOSKernel-41.2 packaging to Mark
+> Tarver's **refreshed S41.2** kernel (shenlanguage.org, re-uploaded
+> 2026-07-11; canonical mirror `pyrex41/shen-s41.1`, tag
+> `s41.2-pristine-20260711`). The refreshed kernel has no
+> `shen.initialise` (init is toplevel forms, wrapped into a synthetic
+> initialiser at shake time), no dict layer (property vector instead),
+> and a leaner surface: 683 boot defuns vs 1,152. Stage 1 plus the lua,
+> rust and go targets are green against their own
+> `kernel/tarver-s41-refresh-20260711` branches (all four fixtures;
+> eval-free `fib` shakes to **54 defuns / 13.4 KB**, metaeval to 548).
+> Known red, tracked for its per-port migration: ShenScript's native
+> `put`/`get` are dict-typed and reject the property vector (breaks all
+> slices on js). Everything below the fold still describes the
+> community-41.2 state where it disagrees.
+
 A tree-shaker for [Shen](https://shenlanguage.org) programs, targeting
 ShenOSKernel **41.2**. Descended from Mark Tarver's **Yggdrasil 1.0**
 (3-clause BSD) — in the myth, Ratatoskr is the squirrel that runs the
@@ -129,10 +145,11 @@ expressions that must execute in source order.
 
 ## How the shake works
 
-The kernel call graph (1129 defuns, 5619 edges) is built once by walking
-every defun body for call-position symbols and cached as plain text
-(`KLambda/callgraph-41.2.shen`). Per shake, a pure worklist reachability
-pass runs from the seed set `{shen.initialise} ∪ symbols(user KL)`. See
+The kernel call graph (683 defuns, 2568 edges on the S41.2 refresh) is
+built once by walking every defun body for call-position symbols and
+cached as plain text (`KLambda/callgraph-s41r-20260711.shen`). Per
+shake, a pure worklist reachability pass runs from the seed set
+`symbols(kernel toplevel init forms) ∪ symbols(user KL)`. See
 `docs/reachability.md` for why this replaced Yggdrasil 1.0's O(N³)
 Warshall transitive closure, and why fancier algorithms lose on this graph.
 
