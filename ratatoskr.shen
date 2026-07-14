@@ -1,9 +1,10 @@
 \\                                           Ratatoskr
 \\                  descended from Yggdrasil 1.0, (c) Mark Tarver, 3 clause BSD
 \\
-\\ Tree-shaker for Shen programs, updated for ShenOSKernel 41.2.
+\\ Tree-shaker for Shen programs, targeting Mark Tarver's refreshed S41.2
+\\ kernel (shenlanguage.org, re-uploaded 2026-07-11).
 \\
-\\ Stage 1 (this file): shake a program against the 41.2 kernel and emit
+\\ Stage 1 (this file): shake a program against that kernel and emit
 \\ minimal KL + a manifest.  Pure Shen against the certified kernel API;
 \\ run it on shen-cl - the user KL comes from the host's bootstrap
 \\ compiler, and other hosts may emit port-internal hooks (see README,
@@ -17,8 +18,9 @@
 \\    ratatoskr.manifest.txt   line-oriented manifest (key=value)
 \\
 \\ Driver contract for builders: load kernel.kl, call (shen.initialise),
-\\ then load the user files in order.  In 41.2 (shen.initialise) performs
-\\ all global initialisation, so no separate globals file is needed.
+\\ then load the user files in order.  The S41 refresh has no
+\\ shen.initialise of its own - the shake synthesises one from the
+\\ kernel's toplevel init forms - so the contract is unchanged.
 \\
 \\ Run from the Ratatoskr directory: paths below are relative.
 
@@ -26,16 +28,22 @@
 \\ stdlib functions are kernel-defined globals.  The public entry point is
 \\ explicitly dot-qualified instead.
 
-\\ ShenOSKernel-41.2 in canonical boot order (shen-cl boot.lsp order).
-(set *kernel* ["KLambda/compiler.kl" "KLambda/toplevel.kl" "KLambda/core.kl"
- "KLambda/sys.kl" "KLambda/dict.kl" "KLambda/sequent.kl" "KLambda/yacc.kl"
- "KLambda/reader.kl" "KLambda/prolog.kl" "KLambda/track.kl" "KLambda/load.kl"
- "KLambda/writer.kl" "KLambda/macros.kl" "KLambda/declarations.kl"
- "KLambda/types.kl" "KLambda/t-star.kl" "KLambda/init.kl"
- "KLambda/extension-features.kl" "KLambda/extension-expand-dynamic.kl"
- "KLambda/extension-launcher.kl" "KLambda/stlib.kl"])
+\\ Tarver S41.2 refresh (shenlanguage.org Download/S41.2.zip, re-uploaded
+\\ 2026-07-11) in install.lsp boot order.  Unlike ShenOSKernel-41.2, this
+\\ kernel has no init.kl/shen.initialise: global initialisation is toplevel
+\\ forms interleaved in the files (declarations.kl sets + arity table +
+\\ external-symbols put + build-lambda-table, types.kl declares).  The shake
+\\ collects those forms and synthesises a (defun shen.initialise () ...)
+\\ so the stage-2 builder contract is unchanged.  backend.kl (the cl.*
+\\ KL->Lisp compiler) is vendored for the Lisp builder's eval path but is
+\\ not part of the runtime boot, matching install.lsp.
+(set *kernel* ["KLambda/sys.kl" "KLambda/writer.kl" "KLambda/core.kl"
+ "KLambda/reader.kl" "KLambda/declarations.kl" "KLambda/toplevel.kl"
+ "KLambda/macros.kl" "KLambda/load.kl" "KLambda/prolog.kl"
+ "KLambda/sequent.kl" "KLambda/track.kl" "KLambda/t-star.kl"
+ "KLambda/yacc.kl" "KLambda/types.kl"])
 
-(set *callgraph-cache* "KLambda/callgraph-41.2.shen")
+(set *callgraph-cache* "KLambda/callgraph-s41r-20260711.shen")
 
 \\ The 41.2 primitives: special forms plus everything the kernel calls but
 \\ does not define.  Derived mechanically: symbols in call position across
@@ -87,25 +95,47 @@
                     KL         (map (fn read-file) KLFiles)
                     UserFs     (function-calls KL)
                     EvalFree   (eval-free? UserFs)
-                    Graph2     (if EvalFree (strip-macros-edge Graph) Graph)
-                    Foot       (footprint [shen.initialise | UserFs] Graph2)
-                    FootCode   (map (/. D (trim-init-tables D Foot EvalFree))
+                    Tops       (prepare-tops (toplevel-forms Kernel) EvalFree)
+                    Graph2     (if EvalFree (strip-f-error-row Graph) Graph)
+                    Seeds      (append (mapcan (fn called-fns) Tops) UserFs)
+                    Foot       (footprint Seeds Graph2)
+                    FootCode   (map (/. D (rewrite-f-error D EvalFree))
                                     (footcode Foot Kernel))
-                    Prims      (find-primitives (append FootCode KL))
-                    WriteK     (write-kl-file (@s Dir "/kernel.kl") FootCode)
+                    Arities    (arity-literal Tops)
+                    TopsOut    (map (/. T (trim-top T Foot EvalFree Arities)) Tops)
+                    InitDefun  (synthesize-initialise TopsOut)
+                    OutCode    (append FootCode [InitDefun])
+                    Prims      (find-primitives (append OutCode KL))
+                    WriteK     (write-kl-file (@s Dir "/kernel.kl") OutCode)
                     UserOut    (write-user-files KLFiles KL Dir)
                     WriteM     (write-manifest Dir UserOut KL Prims)
                     Restore    (set *maximum-print-sequence-size* MaxPrint)
                     done))
 
+\\ The kernel's non-defun toplevel forms, in boot order.  These ARE the
+\\ initialisation in the S41 refresh; they are wrapped into a synthetic
+\\ (defun shen.initialise () ...) at write time so builders keep the
+\\ load-defuns / call-initialise / run-user contract.
+(define toplevel-forms
+  [] -> []
+  [[defun | _] | Code] -> (toplevel-forms Code)
+  [X | Code] -> [X | (toplevel-forms Code)])
+
 \\ ========================== eval stripping ==============================
 \\ The macro expander's registration in *macros* keeps shen.macros - and
 \\ through it the typechecker, the define-compiler and eval - reachable
-\\ from shen.initialise, putting a ~561-defun floor under every program.
-\\ A compiled program only needs that machinery if it can evaluate Shen
-\\ at runtime.  When the user KL never mentions an eval-capable entry
-\\ point we drop the shen.macros edge from the graph and rewrite the
-\\ *macros* registration to (set *macros* ()) at write time.
+\\ from the init forms, putting a large floor under every program.  A
+\\ compiled program only needs that machinery if it can evaluate Shen at
+\\ runtime.  In the S41 refresh the registration is a toplevel form
+\\ (declarations.kl), not an initialise-environment edge, so eval-free
+\\ programs get it blanked in prepare-tops before seeds are computed.
+\\ The 161 toplevel (declare F Type) forms in types.kl seed nothing but
+\\ the typechecker's tables; eval-free programs drop them wholesale.
+\\ The (shen.build-lambda-table (external shen)) form builds the
+\\ name->eta-wrapper table via eval-kl at boot, which would force
+\\ needs-eval=true on every program; eval-free programs get it replaced
+\\ by a placeholder that trim-top expands into a literal
+\\ (set shen.*lambdatable* ...) restricted to the footprint.
 \\ function-calls over-approximates (every symbol counts), which errs in
 \\ the safe direction: a stray symbol named eval keeps the machinery.
 
@@ -120,18 +150,37 @@
   [] _ -> false
   [X | Xs] Ys -> (or (element? X Ys) (intersect? Xs Ys)))
 
-(define strip-macros-edge
+(define prepare-tops
+  Tops false -> Tops
+  Tops true  -> (rat.filter (/. T (not (declare-form? T)))
+                            (map (fn strip-eval-top) Tops)))
+
+(define declare-form?
+  [declare | _] -> true
+  _ -> false)
+
+(define strip-eval-top
+  [set *macros* _] -> [set *macros* []]
+  [shen.build-lambda-table _] -> [rat.lambdatable-placeholder]
+  T -> T)
+
+\\ Eval-free programs cannot re-enter the macro expander, so the pattern
+\\ -failure row loses its edges (its body would otherwise drag the
+\\ tracker/reader) ...
+(define strip-f-error-row
   [] -> []
-  [[shen.initialise-environment | Calls] | Rows]
-     -> [[shen.initialise-environment | (remove shen.macros Calls)]
-         | (strip-macros-edge Rows)]
-  [[shen.f-error | _] | Rows] -> [[shen.f-error] | (strip-macros-edge Rows)]
-  [Row | Rows] -> [Row | (strip-macros-edge Rows)])
+  [[shen.f-error | _] | Rows] -> [[shen.f-error] | Rows]
+  [Row | Rows] -> [Row | (strip-f-error-row Rows)])
+
+\\ ... and the defun itself is replaced by a plain error at write time.
+(define rewrite-f-error
+  [defun shen.f-error | _] true -> (value *static-f-error*)
+  D _ -> D)
 
 \\ In an eval-stripped program the pattern-failure handler must not offer
 \\ interactive tracking (its y-or-n? prompt calls read, dragging the whole
 \\ reader/typechecker/eval); it just errors.  Counterpart of the
-\\ shen.f-error case in strip-macros-edge.
+\\ shen.f-error case in strip-f-error-row.
 (set *static-f-error*
      [defun shen.f-error [V]
         [simple-error [cn [str V] ": partial function or unhandled case"]]])
@@ -214,16 +263,17 @@
   [[defun F _ Body] | Code] -> [[F | (called-fns Body)] | (graph-rows Code)]
   [_ | Code] -> (graph-rows Code))
 
-\\ Two kernel data tables masquerade as code and would otherwise drag
+\\ Several kernel data tables masquerade as code and would otherwise drag
 \\ ~every public symbol into every footprint:
 \\   - the arity table literal is pure name/number data;
-\\   - lambda-form entries (cons F (lambda Y (F Y))) are eta-wrappers
-\\     whose only callee is their own key F.  We drop their edges here
-\\     and instead filter the entries to the footprint at write time
-\\     (see trim-lambda-forms), so a kept entry's F is in Foot already.
+\\   - the external-symbols registration is a name list;
+\\   - a toplevel (declare F Type) uses F as a table key and Type as data
+\\     - the declared function is NOT called by being declared.
+\\ We drop their edges here and filter the surviving literals to the
+\\ footprint at write time (see trim-top).
 (define called-fns
   [shen.initialise-arity-table _] -> [shen.initialise-arity-table]
-  [shen.set-lambda-form-entry [cons _ _]] -> [shen.set-lambda-form-entry]
+  [declare F _] -> (called-fns declare)  where (symbol? F)
   [put P shen.external-symbols _ | Rest] -> (union (called-fns put) (called-fns Rest))
       where (symbol? P)
   [set shen.*special* _] -> (called-fns set)
@@ -391,45 +441,82 @@
 (define footcode
   Footprint Kernel -> (rat.filter (/. Def (mentioned? Def Footprint)) Kernel))
 
-\\ Write-time rewrites of the two initialise defuns whose bodies embed
-\\ registration tables (right-nested do-chains):
-\\   - lambda-forms registers eta-wrappers only for footprint functions
-\\     (counterpart of the called-fns special case above);
-\\   - when eval-stripping, the *macros* registration in
-\\     initialise-environment becomes (set *macros* ()) (counterpart of
-\\     strip-macros-edge).
-(define trim-init-tables
-  [defun shen.initialise-lambda-forms P Body] Foot _ ->
-      [defun shen.initialise-lambda-forms P (trim-lf-chain Body Foot)]
-  [defun shen.initialise-environment P Body] Foot true ->
-      [defun shen.initialise-environment P (strip-macros-chain Body Foot)]
-  [defun shen.f-error | _] _ true -> (value *static-f-error*)
-  Def _ _ -> Def)
+\\ Write-time rewrites of the kept toplevel init forms.  When
+\\ eval-stripping, the arity-table and external-symbols literals are
+\\ restricted to the footprint (plus primitives): an eval-stripped program
+\\ can never define or look up functions outside its footprint, and the
+\\ full literal both bloats kernel.kl and re-introduces stray names
+\\ (eval-kl among them) that find-primitives would report.  The
+\\ lambdatable placeholder from strip-eval-top becomes a literal
+\\ (set shen.*lambdatable* ...) of eta-wrappers for footprint functions -
+\\ what build-lambda-table would have built with eval-kl at boot.
+(define trim-top
+  [shen.initialise-arity-table Lit] Foot true _ ->
+      [shen.initialise-arity-table (trim-arity-pairs Lit (keep-set Foot))]
+  [put P shen.external-symbols Lit V] Foot true _ ->
+      [put P shen.external-symbols (trim-sym-list Lit (keep-set Foot)) V]
+  [rat.lambdatable-placeholder] Foot true Arities ->
+      [set shen.*lambdatable* (consify (lambdatable-entries Foot Arities))]
+  T _ _ _ -> T)
 
-(define trim-lf-chain
-  [do E Rest] Foot -> (let R (trim-lf-chain Rest Foot)
-                           (if (lf-keep? E Foot) [do E R] R))
-  E Foot -> (if (lf-keep? E Foot) E true))
+\\ The synthetic initialiser: the kept toplevel forms, in boot order, as a
+\\ right-nested do-chain.  Builders call it exactly as they called 41.2's
+\\ shen.initialise.
+(define synthesize-initialise
+  Tops -> [defun shen.initialise [] (nest-do Tops)])
 
-(define lf-keep?
-  [shen.set-lambda-form-entry [cons F _]] Foot -> (element? F Foot)
-  _ _ -> true)
+(define nest-do
+  [] -> []
+  [T] -> T
+  [T | Ts] -> [do T (nest-do Ts)])
 
-\\ Alongside emptying *macros*, restrict the arity-table literal to the
-\\ footprint (plus primitives): an eval-stripped program can never define
-\\ or look up functions outside its footprint, and the full literal both
-\\ bloats kernel.kl and re-introduces stray names (eval-kl among them)
-\\ that find-primitives would report.
-(define strip-macros-chain
-  [do [set *macros* _] Rest] Foot -> [do [set *macros* []] (strip-macros-chain Rest Foot)]
-  [do [shen.initialise-arity-table Lit] Rest] Foot ->
-      [do [shen.initialise-arity-table (trim-arity-pairs Lit (keep-set Foot))]
-          (strip-macros-chain Rest Foot)]
-  [do [put P shen.external-symbols Lit V] Rest] Foot ->
-      [do [put P shen.external-symbols (trim-sym-list Lit (keep-set Foot)) V]
-          (strip-macros-chain Rest Foot)]
-  [do E Rest] Foot -> [do E (strip-macros-chain Rest Foot)]
-  E _ -> E)
+\\ The arity-table literal from the toplevel forms (flat alternating
+\\ (cons Name (cons Arity ...)) list); the eta-entry generator reads
+\\ arities out of it.
+(define arity-literal
+  [] -> []
+  [[shen.initialise-arity-table Lit] | _] -> Lit
+  [_ | Tops] -> (arity-literal Tops))
+
+(define arity-of
+  F [cons F [cons A _]] -> A
+  F [cons _ [cons _ Rest]] -> (arity-of F Rest)
+  _ _ -> -1)
+
+\\ Literal eta-wrapper entries, replacing boot-time eval-kl: for each
+\\ footprint function of arity N >= 1, (cons F (lambda X1 .. (F X1..XN))),
+\\ plus build-lambda-table's five hardwired printer entries when they are
+\\ in the footprint.  Deterministic variable names keep kernel.kl
+\\ byte-identical across hosts.
+(define lambdatable-entries
+  Foot Arities -> (append
+                   (mapcan (/. F (eta-hardwired F Foot))
+                           [shen.tuple shen.pvar shen.print-prolog-vector
+                            shen.print-freshterm shen.printF])
+                   (mapcan (/. F (eta-if-fn F Arities)) Foot)))
+
+(define eta-hardwired
+  F Foot -> (if (element? F Foot) [(eta-entry F 1)] []))
+
+(define eta-if-fn
+  F Arities -> (let A (arity-of F Arities)
+                    (if (> A 0) [(eta-entry F A)] [])))
+
+(define eta-entry
+  F N -> (let Vars (eta-vars 1 N)
+             [cons F (eta-nest Vars [F | Vars])]))
+
+(define eta-vars
+  I N -> []  where (> I N)
+  I N -> [(intern (cn "X" (str I))) | (eta-vars (+ I 1) N)])
+
+(define eta-nest
+  [] App -> App
+  [V | Vs] App -> [lambda V (eta-nest Vs App)])
+
+(define consify
+  [] -> []
+  [X | Xs] -> [cons X (consify Xs)])
 
 \\ Names worth keeping in the stripped data tables: footprint plus
 \\ primitives, minus the eval entry points (unreachable by construction).
@@ -592,7 +679,7 @@
   Dir UserFiles Fns Required Optional Globals NeedsEval Reaches Cannot ->
     (let Sink (open (@s Dir "/ratatoskr.manifest") out)
          W1 (pr-kl-line ["ratatoskr-manifest" 2] Sink)
-         W2 (pr-kl-line ["kernel-version" "41.2"] Sink)
+         W2 (pr-kl-line ["kernel-version" "41.2-s41r.20260711"] Sink)
          W3 (pr-kl-line ["kernel" "kernel.kl"] Sink)
          W4 (pr-kl-line ["init" shen.initialise] Sink)
          W5 (pr-kl-line ["user" | UserFiles] Sink)
@@ -609,7 +696,7 @@
   Dir UserFiles Fns Required Optional Globals NeedsEval Reaches Cannot ->
     (let Sink (open (@s Dir "/ratatoskr.manifest.txt") out)
          W1 (pr (make-string "manifest-version=2~%") Sink)
-         W2 (pr (make-string "kernel-version=41.2~%") Sink)
+         W2 (pr (make-string "kernel-version=41.2-s41r.20260711~%") Sink)
          W3 (pr (make-string "kernel=kernel.kl~%") Sink)
          W4 (pr (make-string "init=shen.initialise~%") Sink)
          W5 (rat.mapc (/. F (pr (make-string "user=~A~%" F) Sink)) UserFiles)
