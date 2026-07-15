@@ -116,6 +116,6 @@
     "build": [
       {"argv": ["python3", "{shen_inets}/build_shake.py", "{outdir}", "{outdir}/app.hvml"]}
     ],
-    "run": ["hvm", "run", "{outdir}/app.hvml"]
+    "run": ["python3", "{shen_inets}/run_app.py", "{outdir}/app.hvml"]
   }
 }
