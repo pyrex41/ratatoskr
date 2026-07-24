@@ -11,6 +11,7 @@
 //
 //	shake  PROG OUTDIR             stage 1: emit kernel.kl + <prog>.kl + manifest
 //	build  PROG OUTDIR --target T  stage 1 + stage 2 builder for target T
+//	                               (--web with --target js: emit a browser module)
 //	run    PROG OUTDIR --target T  build, then execute the artifact (prints stdout)
 //	parity PROG OUTDIR             behavioural parity gate: run the shaken slice on
 //	                               every target and diff outputs against a reference
@@ -306,8 +307,9 @@ func subst(s string, subs map[string]string) string {
 }
 
 // build runs a target's stage-2 steps. Returns the run argv, or nil if a needed
-// tool is missing.
-func build(target, outdir string) ([]string, error) {
+// tool is missing. When web is true, "--web" is appended to the ShenScript
+// stage-2 builder step so it emits a browser-safe ES module (see the js target).
+func build(target, outdir string, web bool) ([]string, error) {
 	builders, err := loadBuilders()
 	if err != nil {
 		return nil, err
@@ -344,6 +346,16 @@ func build(target, outdir string) ([]string, error) {
 		argv := make([]string, len(st.Argv))
 		for i, a := range st.Argv {
 			argv[i] = subst(a, subs)
+		}
+		// --web is a pass-through to ShenScript's stage-2 builder: emit a
+		// browser-safe ES module instead of the default Node artifact.
+		if web {
+			for _, a := range argv {
+				if strings.Contains(a, "ratatoskr-build.js") {
+					argv = append(argv, "--web")
+					break
+				}
+			}
 		}
 		cwd := ""
 		if st.Cwd != "" {
@@ -416,6 +428,7 @@ func cmdStage(cmd string, rest []string) int {
 	hostFlag := fs.String("host", "", `stage-1 host launcher (e.g. "node /p/shen.js"); default: shen-cl`)
 	evalStyle := fs.String("eval-style", "sub", "how the host evaluates the shake expr (sub | positional)")
 	target := fs.String("target", "", "stage-2 target (lisp/lua/go/rust/js/julia)")
+	web := fs.Bool("web", false, "with --target js: emit a browser-safe ES module (passes --web to ShenScript's builder)")
 	// Allow flags after the PROG/OUTDIR positionals (Go's flag stops at the
 	// first non-flag token otherwise).
 	if err := fs.Parse(reorderArgs(rest, "host", "eval-style", "target")); err != nil {
@@ -453,11 +466,15 @@ func cmdStage(cmd string, rest []string) int {
 		fmt.Fprintf(os.Stderr, "ratatoskr %s: --target is required\n", cmd)
 		return 2
 	}
+	if *web && *target != "js" {
+		fmt.Fprintf(os.Stderr, "ratatoskr %s: --web only applies to --target js\n", cmd)
+		return 2
+	}
 	if _, err := shake(prog, outdir, host, *evalStyle, true); err != nil {
 		fmt.Fprintln(os.Stderr, "ratatoskr:", err)
 		return 1
 	}
-	runArgv, err := build(*target, outdir)
+	runArgv, err := build(*target, outdir, *web)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "ratatoskr:", err)
 		return 1
@@ -635,7 +652,7 @@ func cmdParity(rest []string) int {
 	for _, t := range targets {
 		r := &parityResult{target: t}
 		results[t] = r
-		runArgv, berr := build(t, outdir)
+		runArgv, berr := build(t, outdir, false)
 		if berr != nil {
 			r.status, r.err = "builderr", berr
 			continue
