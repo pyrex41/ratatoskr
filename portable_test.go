@@ -46,6 +46,16 @@ func TestReorderArgs(t *testing.T) {
 	}
 }
 
+func TestReorderArgsWebBoolFlag(t *testing.T) {
+	// --web is a bool flag (not in valueFlags): it must be pulled forward WITHOUT
+	// swallowing the following positional, so PROG/OUTDIR survive intact.
+	got := reorderArgs([]string{"prog.shen", "out", "--target", "js", "--web"}, "host", "eval-style", "target")
+	want := []string{"--target", "js", "--web", "prog.shen", "out"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("reorderArgs(--web) = %v, want %v", got, want)
+	}
+}
+
 func TestLoadBuildersEmbedded(t *testing.T) {
 	b, err := loadBuilders()
 	if err != nil {

@@ -69,6 +69,7 @@ Then:
 ```bash
 ratatoskr shake prog.shen out/                 # stage 1: emit the KLambda slice
 ratatoskr build prog.shen out/ --target go     # stage 1 + build a Go artifact
+ratatoskr build prog.shen out/ --target js --web  # a BROWSER-safe ES module
 ratatoskr run   prog.shen out/ --target js     # build, then run it (prints stdout)
 ratatoskr parity prog.shen out/                # behavioural parity gate across targets
 ratatoskr targets                              # list stage-2 targets
@@ -78,6 +79,7 @@ ratatoskr targets                              # list stage-2 targets
 |---|---|
 | `shake PROG OUTDIR` | stage 1 — emit `kernel.kl` + `<prog>.kl` + manifest |
 | `build PROG OUTDIR --target T` | stage 1 + the stage-2 builder for target `T` |
+| `build … --target js --web` | emit a browser-safe ES module (`import $ from './app.js'; $.caller('fn')(…)`) instead of the Node artifact — no `node:fs`/streams/`process`; passes `--web` to ShenScript's builder |
 | `run PROG OUTDIR --target T` | build, then execute the artifact |
 | `parity PROG OUTDIR` | run the shaken slice on every target and diff outputs against a reference — see [Behavioural parity gate](#behavioural-parity-gate) |
 | `targets` | list available targets (`lisp`/`lua`/`go`/`rust`/`js`/`julia`/`scheme`/`swift`) |
@@ -139,7 +141,7 @@ repo):
 | LuaJIT | `shen-lua/bin/ratatoskr-build.lua <dir> <out.lua>` | self-contained .lua (~640 KB, ~25 ms startup) |
 | Go | `shen-go/cmd/ratatoskr-build <dir> <outdir>` then `go build` | static binary (~4.5 MB, ≤10 ms startup, cross-compiles linux/windows) |
 | Rust | `shen-rust/crates/ratatoskr-build <dir> <outdir>` then `cargo build --release` | static binary (~9 MB, ~40 ms startup) |
-| JavaScript | `node ShenScript/bin/ratatoskr-build.js <dir> <out.js>` (`--linked` for needs-eval) | self-contained ES module (~120 KB, runs on Node 20+ / Bun / Deno 2) |
+| JavaScript | `node ShenScript/bin/ratatoskr-build.js <dir> <out.js>` (`--linked` for needs-eval; `--web` for a browser module) | self-contained ES module (~120 KB, runs on Node 20+ / Bun / Deno 2; `--web` → browser, `import`s the booted env) |
 | Julia | `julia --project=shen-julia shen-julia/bin/ratatoskr-build.jl <dir> <outdir> [--sysimage]` | artifact project; with `--sysimage` a per-program sysimage (~266 MB, ~0.15 s warm startup), else a lib-mode `.jl` (~4 s, no sysimage). The shaken kernel+user defuns are baked as module methods (same AOT technique as shen-julia's own fast boot). |
 | Chez Scheme | `builders/scheme/build.sh <dir> <outdir>` (this repo; `SHEN_SCHEME=<checkout>`) | self-contained Scheme program dir + `run` launcher (`chez --script`). The shaken kernel+user are compiled with shen-scheme's own `kl->scheme`; overridden kernel fns (`pr`, `shen.char-stoutput?`, dict ops, …) come from shen-scheme's `overrides.scm`, exactly as its own build does. |
 | Swift | `builders/swift/build.sh <dir> <outdir>` (this repo; `SHEN_SWIFT=<checkout>`) | slice + `run` launcher driving the shen-swift tree-walking interpreter in `--shaken` mode. shen-swift is an *interpreter*, so there is nothing to code-generate (like LuaJIT/Julia it references its runtime); the artifact is the KL slice and the win is boot speed — a ~200-line shaken kernel vs the full ~2500-line kernel. |
