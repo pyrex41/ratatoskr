@@ -9,3 +9,6 @@ pybin/*/_bin/
 # Default `go build` output.
 /ratatoskr
 /ratatoskr_bin
+
+# Local launcher binaries built by integration scripts.
+.bin/
