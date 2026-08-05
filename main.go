@@ -24,6 +24,7 @@ import (
 	"embed"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io/fs"
@@ -282,6 +283,73 @@ func loadBuilders() (map[string]builder, error) {
 	return out, nil
 }
 
+// evalEntryPoints mirrors *eval-entry-points* in ratatoskr.shen: the calls that
+// make a program eval-capable, and so force the compiler into the artifact.
+// Kept in sync by hand; only used to explain a failure, never to cause one.
+var evalEntryPoints = []string{
+	"eval", "eval-kl", "load", "tc", "spy", "track", "step", "it",
+	"read", "read-from-string", "lineread", "input", "input+", "bootstrap",
+}
+
+// webPreflight reports why a --web build cannot proceed, before handing the
+// outdir to ShenScript's stage-2 builder. That builder's own message advises
+// "re-run with --linked", which is not an option here: --web and --linked are
+// mutually exclusive, so a browser target has no valid resolution. Name the
+// user-code calls that actually reach eval instead, since those are what the
+// author has to remove.
+func webPreflight(outdir string) error {
+	m, err := os.ReadFile(filepath.Join(outdir, "ratatoskr.manifest.txt"))
+	if err != nil {
+		return nil // no manifest to read: let the builder speak for itself
+	}
+	if !strings.Contains(string(m), "needs-eval=true") {
+		return nil
+	}
+	msg := fmt.Sprintf("--web cannot be built from this program: the manifest reports needs-eval=true.\n"+
+		"  An eval-capable program needs the Shen compiler in the artifact, which only --linked\n"+
+		"  provides, and --web/--linked are mutually exclusive.\n"+
+		"  Manifest: %s", filepath.Join(outdir, "ratatoskr.manifest.txt"))
+	if hits := evalCallsInUserKL(outdir); len(hits) > 0 {
+		msg += fmt.Sprintf("\n  Reaching eval from your code: %s", strings.Join(hits, ", "))
+	}
+	return errors.New(msg)
+}
+
+// evalCallsInUserKL scans the shaken user KL (everything but kernel.kl) for
+// eval entry points, so the error can name them. Token-level and deliberately
+// crude: a false positive costs a slightly wrong hint on an already-failed
+// build, never a failure of its own.
+func evalCallsInUserKL(outdir string) []string {
+	entries, err := os.ReadDir(outdir)
+	if err != nil {
+		return nil
+	}
+	seen := map[string]bool{}
+	var hits []string
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".kl") || e.Name() == "kernel.kl" {
+			continue
+		}
+		src, err := os.ReadFile(filepath.Join(outdir, e.Name()))
+		if err != nil {
+			continue
+		}
+		toks := strings.FieldsFunc(string(src), func(r rune) bool {
+			return r == '(' || r == ')' || r == ' ' || r == '\n' || r == '\t' || r == '\r'
+		})
+		for _, t := range toks {
+			for _, ep := range evalEntryPoints {
+				if t == ep && !seen[t] {
+					seen[t] = true
+					hits = append(hits, t)
+				}
+			}
+		}
+	}
+	sort.Strings(hits)
+	return hits
+}
+
 func siblingDir(target string, b builder) string {
 	if b.DirEnv != "" {
 		if v := os.Getenv(b.DirEnv); v != "" {
@@ -473,6 +541,12 @@ func cmdStage(cmd string, rest []string) int {
 	if _, err := shake(prog, outdir, host, *evalStyle, true); err != nil {
 		fmt.Fprintln(os.Stderr, "ratatoskr:", err)
 		return 1
+	}
+	if *web {
+		if err := webPreflight(outdir); err != nil {
+			fmt.Fprintf(os.Stderr, "ratatoskr %s: %s\n", cmd, err)
+			return 1
+		}
 	}
 	runArgv, err := build(*target, outdir, *web)
 	if err != nil {

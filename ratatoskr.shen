@@ -96,9 +96,10 @@
                     Kernel     (kernel-code)
                     Graph      (call-graph Kernel)
                     KLFiles    (map (fn bootstrap) Files)
-                    KL         (map (fn read-file) KLFiles)
+                    RawKL      (map (fn read-file) KLFiles)
+                    EvalFree   (eval-free? (function-calls RawKL))
+                    KL         (strip-user-declares RawKL EvalFree)
                     UserFs     (function-calls KL)
-                    EvalFree   (eval-free? UserFs)
                     Tops       (prepare-tops (toplevel-forms Kernel) EvalFree)
                     Graph2     (if EvalFree (strip-f-error-row Graph) Graph)
                     Seeds      (append (mapcan (fn called-fns) Tops) UserFs)
@@ -162,6 +163,30 @@
 (define declare-form?
   [declare | _] -> true
   _ -> false)
+
+\\ User (declare F Type) forms get the same treatment as the kernel's own,
+\\ and for the same reason.  A type signature is consumed by the
+\\ typechecker and by nothing else; stage 1 never runs the typechecker
+\\ (bootstrap is read-file + shen->kl-h, purely syntactic - a program whose
+\\ declare contradicts its define shakes without complaint today), so the
+\\ signature in the emitted KL is only ever of use to a typechecker running
+\\ inside the artifact.  That needs the compiler, i.e. eval.  Retained, the
+\\ form is worse than dead weight: the kernel's declare calls eval-kl
+\\ directly (types.kl), so a single signature drags the typechecker, the
+\\ prolog engine and eval into the footprint and flips needs-eval to true -
+\\ which disqualifies --web outright, since --web and --linked are mutually
+\\ exclusive.  (datatype ...) already costs nothing here, but only by
+\\ accident: Shen's compiler consumes it and emits no KL at all.
+\\
+\\ So: drop them exactly when the program is eval-free, the same gate
+\\ prepare-tops uses for the kernel's 161 declares.  An eval-capable
+\\ program keeps its signatures, because it may load and typecheck code at
+\\ runtime; and (tc +) is itself an eval entry point, so any program that
+\\ actually turns the typechecker on is never eval-free and never stripped.
+(define strip-user-declares
+  KL false -> KL
+  KL true  -> (map (/. Forms (rat.filter (/. F (not (declare-form? F))) Forms))
+                   KL))
 
 (define strip-eval-top
   [set *macros* _] -> [set *macros* []]

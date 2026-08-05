@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -53,6 +54,49 @@ func TestReorderArgsWebBoolFlag(t *testing.T) {
 	want := []string{"--target", "js", "--web", "prog.shen", "out"}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("reorderArgs(--web) = %v, want %v", got, want)
+	}
+}
+
+// --web on an eval-capable program has no valid resolution (--linked is
+// mutually exclusive), so the preflight must fail early and say why.
+func TestWebPreflight(t *testing.T) {
+	write := func(dir, name, body string) {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// eval-free: preflight passes.
+	ok := t.TempDir()
+	write(ok, "ratatoskr.manifest.txt", "needs-eval=false\ncannot-reach=eval\n")
+	write(ok, "b.kl", "(defun add2 (V1) (+ V1 2))\n")
+	if err := webPreflight(ok); err != nil {
+		t.Errorf("eval-free program must pass preflight, got: %v", err)
+	}
+
+	// eval-capable: preflight fails, names the culprit, and does NOT repeat
+	// the stage-2 builder's impossible "--linked" advice as the remedy.
+	bad := t.TempDir()
+	write(bad, "ratatoskr.manifest.txt", "needs-eval=true\nreaches=eval\n")
+	write(bad, "p.kl", "(tc +)\n\n(defun p (V1) (eval V1))\n")
+	write(bad, "kernel.kl", "(defun shen.eval-without-macros (V1) (eval-kl V1))\n")
+	err := webPreflight(bad)
+	if err == nil {
+		t.Fatal("needs-eval=true must fail the --web preflight")
+	}
+	for _, want := range []string{"needs-eval=true", "mutually exclusive", "eval", "tc"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("preflight message missing %q:\n%s", want, err)
+		}
+	}
+	// kernel.kl is not user code: its eval-kl must not be blamed on the author.
+	if strings.Contains(err.Error(), "eval-kl") {
+		t.Errorf("preflight blamed kernel.kl:\n%s", err)
+	}
+
+	// No manifest at all: stay quiet and let the stage-2 builder report.
+	if err := webPreflight(t.TempDir()); err != nil {
+		t.Errorf("missing manifest must not fail preflight, got: %v", err)
 	}
 }
 
