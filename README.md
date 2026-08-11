@@ -176,6 +176,22 @@ manifest reports `needs-eval=false`; eval-capable programs keep the full
 machinery (~561 defuns). Detection over-approximates safely — a stray
 symbol named `eval` keeps the machinery.
 
+**Type declarations**: `(declare F Type)` is build-time-only, like
+`(datatype ...)`, and eval-free programs drop it. A signature is read by
+the typechecker and by nothing else; stage 1 never runs the typechecker
+(`bootstrap` is `read-file` + `shen->kl-h`, purely syntactic), so a
+signature in the emitted KL is only of use to a typechecker running
+*inside* the artifact — which needs the compiler. Retained it is worse
+than dead weight: the kernel's `declare` calls `eval-kl` directly, so one
+signature drags the typechecker, the prolog engine and `eval` into the
+footprint and flips `needs-eval` to true, which disqualifies `--web`
+outright (`--web` and `--linked` are mutually exclusive). Eval-capable
+programs keep their signatures, since they can load and typecheck code at
+runtime; and `(tc +)` is itself an eval entry point, so a program that
+actually turns the typechecker on is never eval-free and never stripped.
+Nothing else is affected: a program with declares now shakes to the same
+KL as the same program without them.
+
 The eval-capable path is exercised end-to-end by `tests/metaeval.shen`
 (builds expressions as data — a list, a runtime `define`, a string — and
 evaluates them) on all five targets. Each port embeds or links its own
