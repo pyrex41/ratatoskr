@@ -1,6 +1,6 @@
-// Command ratatoskr is a friendly CLI around the Ratatoskr Shen tree-shaker.
+// Command yggdrasil is a friendly CLI around the Yggdrasil Shen tree-shaker.
 //
-// Ratatoskr itself is a Shen program (ratatoskr.shen) that runs on a host Shen
+// Yggdrasil itself is a Shen program (yggdrasil.shen) that runs on a host Shen
 // port and shakes a Shen program into a minimal, portable KLambda slice;
 // per-target builders then compile that slice into a standalone artifact. This
 // Go binary makes both stages a one-liner and embeds the shaker source + the
@@ -40,7 +40,7 @@ import (
 // Embedded shaker source + kernel slice + per-language primitives + in-repo
 // builders + the build recipe table, so the binary is self-contained.
 //
-//go:embed ratatoskr.shen builders.json
+//go:embed yggdrasil.shen builders.json
 //go:embed KLambda
 //go:embed Primitives
 //go:embed builders
@@ -119,11 +119,11 @@ func embeddedHash() (string, error) {
 
 // ---- materialised root ----
 
-// ratRoot extracts the embedded tree to a versioned cache dir (once) and returns
-// its path. ratatoskr.shen + KLambda + builders must live on disk for the host
+// yggRoot extracts the embedded tree to a versioned cache dir (once) and returns
+// its path. yggdrasil.shen + KLambda + builders must live on disk for the host
 // and the stage-2 builders. The cache key hashes the WHOLE embedded tree, so any
 // change to the shaker, kernel, or a builder invalidates a stale cache.
-func ratRoot() (string, error) {
+func yggRoot() (string, error) {
 	ver, err := embeddedHash()
 	if err != nil {
 		return "", err
@@ -132,7 +132,7 @@ func ratRoot() (string, error) {
 	if err != nil || cache == "" {
 		cache = os.TempDir()
 	}
-	root := filepath.Join(cache, "ratatoskr-go", ver)
+	root := filepath.Join(cache, "yggdrasil-go", ver)
 	sentinel := filepath.Join(root, ".ok")
 	if _, err := os.Stat(sentinel); err == nil {
 		return root, nil // already extracted
@@ -175,9 +175,9 @@ func ratRoot() (string, error) {
 // the host. After the S41.2-refresh migration the reference host is a
 // shen-cl built from its refreshed master; an older community-41.2 binary
 // at that path still works (both produce byte-identical stage-1 output) —
-// rebuild shen-cl master to refresh the host. Override with $RATATOSKR_HOST.
+// rebuild shen-cl master to refresh the host. Override with $YGGDRASIL_HOST.
 func defaultHost() []string {
-	for _, env := range []string{"RATATOSKR_HOST", "BIFROST_SHEN_CL"} {
+	for _, env := range []string{"YGGDRASIL_HOST", "BIFROST_SHEN_CL"} {
 		if v := os.Getenv(env); v != "" {
 			parts := strings.Fields(v)
 			if hit := findExecutablePath(parts[0]); hit != "" {
@@ -199,7 +199,7 @@ func shake(prog, outdir string, host []string, evalStyle string, quiet bool) (st
 		host = defaultHost()
 	}
 	if host == nil {
-		return "", fmt.Errorf("no Shen host launcher found. Set $RATATOSKR_HOST (or $BIFROST_SHEN_CL) to a Shen launcher, e.g.\n  RATATOSKR_HOST=/path/to/shen-cl/bin/sbcl/shen ratatoskr shake ...")
+		return "", fmt.Errorf("no Shen host launcher found. Set $YGGDRASIL_HOST (or $BIFROST_SHEN_CL) to a Shen launcher, e.g.\n  YGGDRASIL_HOST=/path/to/shen-cl/bin/sbcl/shen yggdrasil shake ...")
 	}
 	prog, _ = filepath.Abs(prog)
 	outdir, _ = filepath.Abs(outdir)
@@ -209,19 +209,19 @@ func shake(prog, outdir string, host []string, evalStyle string, quiet bool) (st
 	if err := os.MkdirAll(outdir, 0o755); err != nil {
 		return "", err
 	}
-	root, err := ratRoot()
+	root, err := yggRoot()
 	if err != nil {
 		return "", fmt.Errorf("materialising shaker: %w", err)
 	}
-	expr := fmt.Sprintf(`(ratatoskr.shake ["%s"] "%s")`, prog, outdir)
+	expr := fmt.Sprintf(`(yggdrasil.shake ["%s"] "%s")`, prog, outdir)
 
 	var argv []string
 	if evalStyle == "positional" {
 		drv := filepath.Join(outdir, "_shake_driver.shen")
-		os.WriteFile(drv, []byte("(load \"ratatoskr.shen\")\n"+expr+"\n"), 0o644)
+		os.WriteFile(drv, []byte("(load \"yggdrasil.shen\")\n"+expr+"\n"), 0o644)
 		argv = append(append([]string{}, host...), drv)
 	} else {
-		argv = append(append([]string{}, host...), "eval", "-q", "-l", "ratatoskr.shen", "-e", expr)
+		argv = append(append([]string{}, host...), "eval", "-q", "-l", "yggdrasil.shen", "-e", expr)
 	}
 
 	out, _ := runAt(wrapExecutable(argv), root)
@@ -283,7 +283,7 @@ func loadBuilders() (map[string]builder, error) {
 	return out, nil
 }
 
-// evalEntryPoints mirrors *eval-entry-points* in ratatoskr.shen: the calls that
+// evalEntryPoints mirrors *eval-entry-points* in yggdrasil.shen: the calls that
 // make a program eval-capable, and so force the compiler into the artifact.
 // Kept in sync by hand; only used to explain a failure, never to cause one.
 var evalEntryPoints = []string{
@@ -298,7 +298,7 @@ var evalEntryPoints = []string{
 // user-code calls that actually reach eval instead, since those are what the
 // author has to remove.
 func webPreflight(outdir string) error {
-	m, err := os.ReadFile(filepath.Join(outdir, "ratatoskr.manifest.txt"))
+	m, err := os.ReadFile(filepath.Join(outdir, "yggdrasil.manifest.txt"))
 	if err != nil {
 		return nil // no manifest to read: let the builder speak for itself
 	}
@@ -308,7 +308,7 @@ func webPreflight(outdir string) error {
 	msg := fmt.Sprintf("--web cannot be built from this program: the manifest reports needs-eval=true.\n"+
 		"  An eval-capable program needs the Shen compiler in the artifact, which only --linked\n"+
 		"  provides, and --web/--linked are mutually exclusive.\n"+
-		"  Manifest: %s", filepath.Join(outdir, "ratatoskr.manifest.txt"))
+		"  Manifest: %s", filepath.Join(outdir, "yggdrasil.manifest.txt"))
 	if hits := evalCallsInUserKL(outdir); len(hits) > 0 {
 		msg += fmt.Sprintf("\n  Reaching eval from your code: %s", strings.Join(hits, ", "))
 	}
@@ -361,6 +361,7 @@ func siblingDir(target string, b builder) string {
 		"lua": "shen-lua", "go": "shen-go", "rust": "shen-rust",
 		"js": "ShenScript", "julia": "shen-julia", "scheme": "shen-scheme",
 		"swift": "shen-swift", "lisp": "shen-cl", "hvm": "inets/shen-inets",
+		"truffle": "shen-truffle", "truffle-native": "shen-truffle",
 	}[target]
 	cwd, _ := os.Getwd()
 	abs, _ := filepath.Abs(filepath.Join(cwd, "..", name))
@@ -397,18 +398,19 @@ func build(target, outdir string, web bool) ([]string, error) {
 		}
 	}
 	outdir, _ = filepath.Abs(outdir)
-	root, err := ratRoot()
+	root, err := yggRoot()
 	if err != nil {
 		return nil, err
 	}
-	tmp, _ := os.MkdirTemp("", "ratatoskr_build_")
+	tmp, _ := os.MkdirTemp("", "yggdrasil_build_")
 	subs := map[string]string{
-		"{ratroot}": root, "{outdir}": outdir, "{tmp}": tmp,
+		"{yggroot}": root, "{outdir}": outdir, "{tmp}": tmp,
 		"{shen_lua}": siblingDir("lua", b), "{shen_go}": siblingDir("go", b),
 		"{shen_rust}": siblingDir("rust", b), "{shenscript}": siblingDir("js", b),
 		"{shen_julia}": siblingDir("julia", b), "{shen_scheme}": siblingDir("scheme", b),
 		"{shen_swift}": siblingDir("swift", b), "{shen_cl}": siblingDir("lisp", b),
-		"{shen_inets}": siblingDir("hvm", b),
+		"{shen_inets}":   siblingDir("hvm", b),
+		"{shen_truffle}": siblingDir(target, b),
 	}
 	for _, st := range b.Build {
 		argv := make([]string, len(st.Argv))
@@ -419,7 +421,7 @@ func build(target, outdir string, web bool) ([]string, error) {
 		// browser-safe ES module instead of the default Node artifact.
 		if web {
 			for _, a := range argv {
-				if strings.Contains(a, "ratatoskr-build.js") {
+				if strings.Contains(a, "yggdrasil-build.js") {
 					argv = append(argv, "--web")
 					break
 				}
@@ -459,7 +461,7 @@ func main() { os.Exit(run(os.Args[1:])) }
 
 func run(args []string) int {
 	if len(args) == 0 {
-		fmt.Fprintln(os.Stderr, "usage: ratatoskr <shake|build|run|parity|targets> ...")
+		fmt.Fprintln(os.Stderr, "usage: yggdrasil <shake|build|run|parity|targets> ...")
 		return 2
 	}
 	cmd, rest := args[0], args[1:]
@@ -467,7 +469,7 @@ func run(args []string) int {
 	case "targets":
 		builders, err := loadBuilders()
 		if err != nil {
-			fmt.Fprintln(os.Stderr, "ratatoskr:", err)
+			fmt.Fprintln(os.Stderr, "yggdrasil:", err)
 			return 1
 		}
 		var names []string
@@ -485,17 +487,17 @@ func run(args []string) int {
 	case "parity":
 		return cmdParity(rest)
 	default:
-		fmt.Fprintf(os.Stderr, "ratatoskr: unknown subcommand %q\n", cmd)
+		fmt.Fprintf(os.Stderr, "yggdrasil: unknown subcommand %q\n", cmd)
 		return 2
 	}
 }
 
 func cmdStage(cmd string, rest []string) int {
-	fs := flag.NewFlagSet("ratatoskr "+cmd, flag.ContinueOnError)
+	fs := flag.NewFlagSet("yggdrasil "+cmd, flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
 	hostFlag := fs.String("host", "", `stage-1 host launcher (e.g. "node /p/shen.js"); default: shen-cl`)
 	evalStyle := fs.String("eval-style", "sub", "how the host evaluates the shake expr (sub | positional)")
-	target := fs.String("target", "", "stage-2 target (lisp/lua/go/rust/js/julia)")
+	target := fs.String("target", "", "stage-2 target (lisp/lua/go/rust/js/julia/scheme/swift/truffle/truffle-native)")
 	web := fs.Bool("web", false, "with --target js: emit a browser-safe ES module (passes --web to ShenScript's builder)")
 	// Allow flags after the PROG/OUTDIR positionals (Go's flag stops at the
 	// first non-flag token otherwise).
@@ -503,7 +505,7 @@ func cmdStage(cmd string, rest []string) int {
 		return 2
 	}
 	if fs.NArg() < 2 {
-		fmt.Fprintf(os.Stderr, "usage: ratatoskr %s PROG OUTDIR%s\n", cmd, map[string]string{"shake": ""}[cmd]+ifTarget(cmd))
+		fmt.Fprintf(os.Stderr, "usage: yggdrasil %s PROG OUTDIR%s\n", cmd, map[string]string{"shake": ""}[cmd]+ifTarget(cmd))
 		return 2
 	}
 	prog, outdir := fs.Arg(0), fs.Arg(1)
@@ -518,7 +520,7 @@ func cmdStage(cmd string, rest []string) int {
 	if cmd == "shake" {
 		out, err := shake(prog, outdir, host, *evalStyle, false)
 		if err != nil {
-			fmt.Fprintln(os.Stderr, "ratatoskr:", err)
+			fmt.Fprintln(os.Stderr, "yggdrasil:", err)
 			return 1
 		}
 		fmt.Println("shaken ->", out)
@@ -531,30 +533,30 @@ func cmdStage(cmd string, rest []string) int {
 
 	// build / run
 	if *target == "" {
-		fmt.Fprintf(os.Stderr, "ratatoskr %s: --target is required\n", cmd)
+		fmt.Fprintf(os.Stderr, "yggdrasil %s: --target is required\n", cmd)
 		return 2
 	}
 	if *web && *target != "js" {
-		fmt.Fprintf(os.Stderr, "ratatoskr %s: --web only applies to --target js\n", cmd)
+		fmt.Fprintf(os.Stderr, "yggdrasil %s: --web only applies to --target js\n", cmd)
 		return 2
 	}
 	if _, err := shake(prog, outdir, host, *evalStyle, true); err != nil {
-		fmt.Fprintln(os.Stderr, "ratatoskr:", err)
+		fmt.Fprintln(os.Stderr, "yggdrasil:", err)
 		return 1
 	}
 	if *web {
 		if err := webPreflight(outdir); err != nil {
-			fmt.Fprintf(os.Stderr, "ratatoskr %s: %s\n", cmd, err)
+			fmt.Fprintf(os.Stderr, "yggdrasil %s: %s\n", cmd, err)
 			return 1
 		}
 	}
 	runArgv, err := build(*target, outdir, *web)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "ratatoskr:", err)
+		fmt.Fprintln(os.Stderr, "yggdrasil:", err)
 		return 1
 	}
 	if runArgv == nil {
-		fmt.Fprintf(os.Stderr, "ratatoskr: target %q skipped (a required tool is not on PATH)\n", *target)
+		fmt.Fprintf(os.Stderr, "yggdrasil: target %q skipped (a required tool is not on PATH)\n", *target)
 		return 3
 	}
 	if cmd == "build" {
@@ -569,7 +571,7 @@ func cmdStage(cmd string, rest []string) int {
 		if ee, ok := err.(*exec.ExitError); ok {
 			return ee.ExitCode()
 		}
-		fmt.Fprintln(os.Stderr, "ratatoskr:", err)
+		fmt.Fprintln(os.Stderr, "yggdrasil:", err)
 		return 1
 	}
 	return 0
@@ -655,7 +657,7 @@ type parityResult struct {
 }
 
 func cmdParity(rest []string) int {
-	fs := flag.NewFlagSet("ratatoskr parity", flag.ContinueOnError)
+	fs := flag.NewFlagSet("yggdrasil parity", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
 	hostFlag := fs.String("host", "", `stage-1 host launcher (e.g. "node /p/shen.js"); default: shen-cl`)
 	evalStyle := fs.String("eval-style", "sub", "how the host evaluates the shake expr (sub | positional)")
@@ -667,7 +669,7 @@ func cmdParity(rest []string) int {
 		return 2
 	}
 	if fs.NArg() < 2 {
-		fmt.Fprintln(os.Stderr, "usage: ratatoskr parity PROG OUTDIR [--target a,b] [--reference R] [--expect FILE]")
+		fmt.Fprintln(os.Stderr, "usage: yggdrasil parity PROG OUTDIR [--target a,b] [--reference R] [--expect FILE]")
 		return 2
 	}
 	prog, outdir := fs.Arg(0), fs.Arg(1)
@@ -681,7 +683,7 @@ func cmdParity(rest []string) int {
 
 	builders, err := loadBuilders()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "ratatoskr:", err)
+		fmt.Fprintln(os.Stderr, "yggdrasil:", err)
 		return 1
 	}
 
@@ -694,7 +696,7 @@ func cmdParity(rest []string) int {
 				continue
 			}
 			if _, ok := builders[t]; !ok {
-				fmt.Fprintf(os.Stderr, "ratatoskr: unknown target %q\n", t)
+				fmt.Fprintf(os.Stderr, "yggdrasil: unknown target %q\n", t)
 				return 2
 			}
 			targets = append(targets, t)
@@ -708,7 +710,7 @@ func cmdParity(rest []string) int {
 	// Without a golden, the reference target must be built to supply the truth.
 	if *expect == "" && !contains(targets, *reference) {
 		if _, ok := builders[*reference]; !ok {
-			fmt.Fprintf(os.Stderr, "ratatoskr: unknown reference target %q\n", *reference)
+			fmt.Fprintf(os.Stderr, "yggdrasil: unknown reference target %q\n", *reference)
 			return 2
 		}
 		targets = append([]string{*reference}, targets...)
@@ -716,7 +718,7 @@ func cmdParity(rest []string) int {
 
 	// Stage 1, once.
 	if _, err := shake(prog, outdir, host, *evalStyle, true); err != nil {
-		fmt.Fprintln(os.Stderr, "ratatoskr:", err)
+		fmt.Fprintln(os.Stderr, "yggdrasil:", err)
 		return 1
 	}
 	outdir, _ = filepath.Abs(outdir)
@@ -755,14 +757,14 @@ func cmdParity(rest []string) int {
 	if *expect != "" {
 		b, err := os.ReadFile(*expect)
 		if err != nil {
-			fmt.Fprintln(os.Stderr, "ratatoskr: cannot read --expect file:", err)
+			fmt.Fprintln(os.Stderr, "yggdrasil: cannot read --expect file:", err)
 			return 1
 		}
 		truth, truthSrc = canon(string(b)), "expect:"+filepath.Base(*expect)
 	} else {
 		ref := results[*reference]
 		if ref == nil || ref.status != "ok" {
-			fmt.Fprintf(os.Stderr, "ratatoskr: cannot establish a reference: target %q is %s "+
+			fmt.Fprintf(os.Stderr, "yggdrasil: cannot establish a reference: target %q is %s "+
 				"(install its toolchain or pass --expect FILE)\n", *reference,
 				statusOr(ref, "unavailable"))
 			return 1

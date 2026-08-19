@@ -1,6 +1,6 @@
-# Ratatoskr Showcase Ideas
+# Yggdrasil Showcase Ideas
 
-Candidate flagship demos for Ratatoskr — applications that genuinely need
+Candidate flagship demos for Yggdrasil — applications that genuinely need
 Shen's unique features, not just tolerate them.
 
 ## The framing
@@ -13,7 +13,7 @@ Shen's distinctive features, and what a showcase must exercise:
 2. **Embedded Prolog** (`defprolog`) — analysis questions become queries:
    reachability, shadowing, trust paths, access diffs.
 3. **Shen-YACC / `defcc`** — a compiler-compiler in the box. DSLs are cheap.
-4. **Ratatoskr itself** — one source shakes to a ~640 KB Lua file, a
+4. **Yggdrasil itself** — one source shakes to a ~640 KB Lua file, a
    ~4.5 MB static Go binary (≤10 ms startup), a Rust binary, a ~120 KB
    self-contained JS module (Node/Bun/Deno), or a Lisp image.
    Eval-stripped programs carry only ~100 kernel defuns.
@@ -25,7 +25,7 @@ embedded in a host (nginx, the OS kernel, a CI pipeline) that does the I/O
 and the crypto. A whole web server in Shen fights the platform; a verified
 *brain inside* nginx uses it.
 
-A recurring architectural pattern below, mirroring Ratatoskr's own
+A recurring architectural pattern below, mirroring Yggdrasil's own
 two-stage design:
 
 - **Authoring/compiler tool** — full Shen, eval machinery welcome, runs at
@@ -63,7 +63,7 @@ sidecar, no IPC — the verified decision logic runs inside the nginx worker.
   - **Diff safety** — "does this change open anything that was closed?"
     A Prolog query comparing two rulesets, run in CI on every policy PR.
 - The compiler emits a specialized Shen program for *that ruleset* —
-  decision logic as straight pattern matching — and Ratatoskr shakes it.
+  decision logic as straight pattern matching — and Yggdrasil shakes it.
   Deploy the Lua artifact to OpenResty; deploy the *identical* ruleset as a
   Go binary for services not behind nginx.
 
@@ -176,7 +176,7 @@ policy-as-binary trick from Idea 1) keep it fast.
 **The hook:** parsers of untrusted input are where the CVEs live
 (heartbleed-class bugs are parser bugs). The langsec community's answer is
 "parse with verified grammars, not hand-rolled pointer arithmetic" — but
-their tooling rarely meets production runtimes. `defcc` + Ratatoskr does.
+their tooling rarely meets production runtimes. `defcc` + Yggdrasil does.
 
 **What it does:**
 
@@ -222,7 +222,7 @@ convincing to a security audience.
 
 **Why it ranks lower:** real pain point, and the type-theory angle is the
 purest Shen flex of the bunch — but the output is dead files rather than a
-running artifact, so it shows off Ratatoskr's deployment story least. Good
+running artifact, so it shows off Yggdrasil's deployment story least. Good
 blog-post material; weaker live demo.
 
 ---

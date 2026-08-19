@@ -1,6 +1,6 @@
 name: go
 
-# Builds and tests the Go ratatoskr CLI on Linux, macOS and Windows. Unit tests
+# Builds and tests the Go yggdrasil CLI on Linux, macOS and Windows. Unit tests
 # exercise the cross-platform helpers + the embedded builders.json on every OS.
 # (A full shake needs a Shen host + the kernel callgraph cache, which regenerates
 # at runtime; that path is covered by the integration demo, not this matrix.)
@@ -22,9 +22,9 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: "1.23.x"
-      - run: go build -o ratatoskr_bin ./...
+      - run: go build -o yggdrasil_bin ./...
       - run: go vet ./...
       - run: go test ./...
       - name: targets smoke (no host needed)
         shell: bash
-        run: ./ratatoskr_bin targets
+        run: ./yggdrasil_bin targets

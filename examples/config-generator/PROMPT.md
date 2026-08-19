@@ -1,11 +1,11 @@
 # Prompt: Typed configuration generator (Dhall/CUE competitor)
 
 > Idea 5 of [demo_ideas.md](../demo_ideas.md). Smallest scope; the purest
-> showcase of Shen's type system, the lightest use of Ratatoskr.
+> showcase of Shen's type system, the lightest use of Yggdrasil.
 
 ## Context
 
-This repo is Ratatoskr, a tree-shaker for Shen programs: stage 1
+This repo is Yggdrasil, a tree-shaker for Shen programs: stage 1
 computes the reachable ShenOSKernel-41.2 slice and emits KLambda + a
 manifest; per-target stage-2 builders compile it. The Go builder produces
 a static single-file binary — the same distribution story as `kustomize`,
@@ -51,8 +51,8 @@ documents under user-defined inference rules.
   try to parse YAML, only emit it.
 - Shen's `read-file` is not a data reader; parse the input DSL from plain
   text with a hand-rolled lexer + `defcc`, keeping `needs-eval=false`.
-- 41.2 stlib is lazily materialised in ports — use the `rat.*` helpers
-  from `ratatoskr.shen`.
+- 41.2 stlib is lazily materialised in ports — use the `ygg.*` helpers
+  from `yggdrasil.shen`.
 - Scope discipline: do NOT model the full Kubernetes API. Pick the four
   object kinds above with a minimal field set sufficient for the rules.
 
@@ -75,6 +75,6 @@ documents under user-defined inference rules.
 ## Honest positioning
 
 This idea ranks last for *demo* purposes — the output is dead files, so
-Ratatoskr's multi-target story barely appears. Its role in the set is
+Yggdrasil's multi-target story barely appears. Its role in the set is
 blog-post material: the clearest illustration that Shen types are
 inference rules over your domain, not annotations over your code.

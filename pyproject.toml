@@ -3,9 +3,9 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "ratatoskr-shen"
+name = "yggdrasil-shen"
 version = "0.2.0"
-description = "Ratatoskr — a tree-shaker for Shen programs (Go binary, uvx-installable)"
+description = "Yggdrasil — a tree-shaker for Shen programs (Go binary, uvx-installable)"
 readme = "README.md"
 requires-python = ">=3.8"
 license = { text = "BSD-3-Clause" }
@@ -13,12 +13,12 @@ keywords = ["shen", "tree-shaking", "klambda", "compiler"]
 
 # uvx path: the wheel build compiles the Go binary on the target machine (needs
 # the Go toolchain) and the console script execs it. No-Go paths:
-# `go install github.com/pyrex41/ratatoskr@latest` and the release binaries.
+# `go install github.com/pyrex41/yggdrasil@latest` and the release binaries.
 [project.scripts]
-ratatoskr = "ratatoskr_launch:main"
+yggdrasil = "yggdrasil_launch:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["pybin/ratatoskr_launch"]
+packages = ["pybin/yggdrasil_launch"]
 
 [tool.hatch.build.targets.wheel.hooks.custom]
 path = "pybin/hatch_build.py"
@@ -27,6 +27,6 @@ path = "pybin/hatch_build.py"
 # Ship the Go sources + everything the binary embeds, so the wheel builds from
 # an sdist / git checkout (the gitignored callgraph cache regenerates at runtime).
 include = [
-  "pybin", "go.mod", "*.go", "ratatoskr.shen", "builders.json",
+  "pybin", "go.mod", "*.go", "yggdrasil.shen", "builders.json",
   "KLambda", "Primitives", "builders", "README.md",
 ]

@@ -1,4 +1,4 @@
-# Ratatoskr
+# Yggdrasil
 
 > **Kernel lineage — S41.2 refresh (merged).** The shaker targets Mark
 > Tarver's **refreshed S41.2** kernel (shenlanguage.org, re-uploaded
@@ -18,10 +18,9 @@
 
 A tree-shaker for [Shen](https://shenlanguage.org) programs, targeting
 Tarver's refreshed **S41.2** kernel. Descended from Mark Tarver's **Yggdrasil 1.0**
-(3-clause BSD) — in the myth, Ratatoskr is the squirrel that runs the
-trunk of Yggdrasil, carrying messages between crown and roots; here it
-walks the kernel call graph and carries a minimal slice of the tree to
-each target runtime.
+(3-clause BSD), it restores the name Tarver gave the project. In Norse
+mythology Yggdrasil is the world tree; here its roots are KLambda and its
+branches are the target runtimes reached by each minimal kernel slice.
 
 Dr. Tarver's original vision and description, *Using Yggdrasil to Generate
 Stand-alone Programs from Shen* (Shen Group, 2023), is preserved here as
@@ -30,7 +29,7 @@ repository started from is archived in [`archive/`](archive/) along with the
 [Wayback Machine capture](https://web.archive.org/web/20240430183437/https://www.shenlanguage.org/Download/Yggdrasil.zip)
 it was retrieved from.
 
-Ratatoskr turns a Shen program into a minimal, standalone artifact in a
+Yggdrasil turns a Shen program into a minimal, standalone artifact in a
 target language: it computes which of the kernel's 683 functions the
 program can actually reach, emits just that slice as KLambda, and hands the
 result to a per-target builder that compiles it with the target port's own
@@ -51,7 +50,7 @@ KL compiler.
 [showboat]) that shakes one program and produces a running artifact on all
 five targets; `showboat verify DEMO.md` re-executes every step.
 
-## CLI (`ratatoskr`)
+## CLI (`yggdrasil`)
 
 A single static **Go binary** wraps both stages so you don't hand-write the
 launcher invocation. It embeds the shaker source + the kernel KLambda slice and
@@ -59,20 +58,20 @@ materialises them to a cache dir on first use, so it runs with no checkout.
 Install it three ways:
 
 ```bash
-go install github.com/pyrex41/ratatoskr@latest        # Go toolchain
+go install github.com/pyrex41/yggdrasil@latest        # Go toolchain
 # or download a prebuilt release binary for your OS/arch (GitHub Releases)
-uvx --from git+https://github.com/pyrex41/ratatoskr ratatoskr targets  # uvx (builds Go locally)
+uvx --from git+https://github.com/pyrex41/yggdrasil yggdrasil targets  # uvx (builds Go locally)
 ```
 
 Then:
 
 ```bash
-ratatoskr shake prog.shen out/                 # stage 1: emit the KLambda slice
-ratatoskr build prog.shen out/ --target go     # stage 1 + build a Go artifact
-ratatoskr build prog.shen out/ --target js --web  # a BROWSER-safe ES module
-ratatoskr run   prog.shen out/ --target js     # build, then run it (prints stdout)
-ratatoskr parity prog.shen out/                # behavioural parity gate across targets
-ratatoskr targets                              # list stage-2 targets
+yggdrasil shake prog.shen out/                 # stage 1: emit the KLambda slice
+yggdrasil build prog.shen out/ --target go     # stage 1 + build a Go artifact
+yggdrasil build prog.shen out/ --target js --web  # a BROWSER-safe ES module
+yggdrasil run   prog.shen out/ --target js     # build, then run it (prints stdout)
+yggdrasil parity prog.shen out/                # behavioural parity gate across targets
+yggdrasil targets                              # list stage-2 targets
 ```
 
 | subcommand | does |
@@ -82,7 +81,7 @@ ratatoskr targets                              # list stage-2 targets
 | `build … --target js --web` | emit a browser-safe ES module (`import $ from './app.js'; $.caller('fn')(…)`) instead of the Node artifact — no `node:fs`/streams/`process`; passes `--web` to ShenScript's builder |
 | `run PROG OUTDIR --target T` | build, then execute the artifact |
 | `parity PROG OUTDIR` | run the shaken slice on every target and diff outputs against a reference — see [Behavioural parity gate](#behavioural-parity-gate) |
-| `targets` | list available targets (`lisp`/`lua`/`go`/`rust`/`js`/`julia`/`scheme`/`swift`) |
+| `targets` | list available targets (`lisp`/`lua`/`go`/`rust`/`js`/`julia`/`scheme`/`swift`/`truffle`/`truffle-native`) |
 
 The stage-1 **host** defaults to the sibling `../shen-cl/bin/sbcl/shen`
 binary, used as-is. The reference is shen-cl built from its S41.2-refresh
@@ -92,10 +91,10 @@ byte-identical `kernel.kl` + manifest on every fixture (user KL differs
 only in gensym numbering), so a stale sibling build is a correctness
 no-op. Rebuild shen-cl from master to refresh the host. Override with
 `--host "<launcher>"` (e.g. `--host "node /path/shen.js" --eval-style
-sub`, or `--eval-style positional` for shen-lua), or set `$RATATOSKR_HOST`
+sub`, or `--eval-style positional` for shen-lua), or set `$YGGDRASIL_HOST`
 or `$BIFROST_SHEN_CL`. Stage-2
 builders live in the sibling port repos (`../shen-lua`, `../shen-go`, …),
-overridable per target via `$RATATOSKR_SHEN_*_DIR`; the build/run recipes are
+overridable per target via `$YGGDRASIL_SHEN_*_DIR`; the build/run recipes are
 data in [`builders.json`](builders.json), which [Bifrost](../bifrost)'s
 `--shake` mode reads too.
 
@@ -114,7 +113,7 @@ is available is your environment's call.
 host-portability gotcha for per-host launcher syntax):
 
 ```
-shen eval -q -l ratatoskr.shen -e '(ratatoskr.shake ["prog.shen"] "out")'
+shen eval -q -l yggdrasil.shen -e '(yggdrasil.shake ["prog.shen"] "out")'
 ```
 
 writes to `out/`:
@@ -123,8 +122,8 @@ writes to `out/`:
 |---|---|
 | `kernel.kl` | shaken kernel defuns, load order preserved |
 | `<prog>.kl` | the user program compiled to KLambda |
-| `ratatoskr.manifest.txt` | line-oriented contract (`key=value`) |
-| `ratatoskr.manifest` | same, as s-expressions |
+| `yggdrasil.manifest.txt` | line-oriented contract (`key=value`) |
+| `yggdrasil.manifest` | same, as s-expressions |
 
 The manifest also reports the artifact's effectful **capabilities** —
 `reaches=` / `cannot-reach=` over `{eval, read, write, file, clock}` —
@@ -138,13 +137,15 @@ repo):
 | target | builder | output (eval-stripped fib) |
 |---|---|---|
 | Common Lisp | `builders/lisp/build.sh <dir> <exe>` (this repo; `LISP_IMPL=sbcl\|clisp\|ecl`) | saved image (SBCL ~36 MB, CLISP ~7.8 MB) or compiled binary (ECL ~620 KB + libecl) |
-| LuaJIT | `shen-lua/bin/ratatoskr-build.lua <dir> <out.lua>` | self-contained .lua (~640 KB, ~25 ms startup) |
-| Go | `shen-go/cmd/ratatoskr-build <dir> <outdir>` then `go build` | static binary (~4.5 MB, ≤10 ms startup, cross-compiles linux/windows) |
-| Rust | `shen-rust/crates/ratatoskr-build <dir> <outdir>` then `cargo build --release` | static binary (~9 MB, ~40 ms startup) |
-| JavaScript | `node ShenScript/bin/ratatoskr-build.js <dir> <out.js>` (`--linked` for needs-eval; `--web` for a browser module) | self-contained ES module (~120 KB, runs on Node 20+ / Bun / Deno 2; `--web` → browser, `import`s the booted env) |
-| Julia | `julia --project=shen-julia shen-julia/bin/ratatoskr-build.jl <dir> <outdir> [--sysimage]` | artifact project; with `--sysimage` a per-program sysimage (~266 MB, ~0.15 s warm startup), else a lib-mode `.jl` (~4 s, no sysimage). The shaken kernel+user defuns are baked as module methods (same AOT technique as shen-julia's own fast boot). |
+| LuaJIT | `shen-lua/bin/yggdrasil-build.lua <dir> <out.lua>` | self-contained .lua (~640 KB, ~25 ms startup) |
+| Go | `shen-go/cmd/yggdrasil-build <dir> <outdir>` then `go build` | static binary (~4.5 MB, ≤10 ms startup, cross-compiles linux/windows) |
+| Rust | `shen-rust/crates/yggdrasil-build <dir> <outdir>` then `cargo build --release` | static binary (~9 MB, ~40 ms startup) |
+| JavaScript | `node ShenScript/bin/yggdrasil-build.js <dir> <out.js>` (`--linked` for needs-eval; `--web` for a browser module) | self-contained ES module (~120 KB, runs on Node 20+ / Bun / Deno 2; `--web` → browser, `import`s the booted env) |
+| Julia | `julia --project=shen-julia shen-julia/bin/yggdrasil-build.jl <dir> <outdir> [--sysimage]` | artifact project; with `--sysimage` a per-program sysimage (~266 MB, ~0.15 s warm startup), else a lib-mode `.jl` (~4 s, no sysimage). The shaken kernel+user defuns are baked as module methods (same AOT technique as shen-julia's own fast boot). |
 | Chez Scheme | `builders/scheme/build.sh <dir> <outdir>` (this repo; `SHEN_SCHEME=<checkout>`) | self-contained Scheme program dir + `run` launcher (`chez --script`). The shaken kernel+user are compiled with shen-scheme's own `kl->scheme`; overridden kernel fns (`pr`, `shen.char-stoutput?`, dict ops, …) come from shen-scheme's `overrides.scm`, exactly as its own build does. |
 | Swift | `builders/swift/build.sh <dir> <outdir>` (this repo; `SHEN_SWIFT=<checkout>`) | slice + `run` launcher driving the shen-swift tree-walking interpreter in `--shaken` mode. shen-swift is an *interpreter*, so there is nothing to code-generate (like LuaJIT/Julia it references its runtime); the artifact is the KL slice and the win is boot speed — a ~200-line shaken kernel vs the full ~2500-line kernel. |
+| Truffle (JVM) | `java -jar shen-truffle/target/yggdrasil-builder.jar --format jvm <dir> <out>` | relocatable JVM application (`app-truffle/bin/shen-truffle`) launched with Java; requires the Shen 41.2 Truffle runtime. |
+| Truffle (Native Image) | `java -jar shen-truffle/target/yggdrasil-builder.jar --format native <dir> <out>` | platform-native executable (`app-truffle-native`) produced by the Truffle builder. |
 
 **Builder contract**: load `kernel.kl`'s defuns, call `(shen.initialise)`
 (41.2 consolidates all global initialisation there), then run each user
@@ -209,7 +210,7 @@ mode refuses eval-capable manifests).
   parsed as plain text.
 - 41.2's stlib is lazily materialised: `mapc`, `filter`,
   `remove-duplicates`, `copy-file` don't exist in port runtimes.
-  `ratatoskr.shen` carries its own `rat.*` versions.
+  `yggdrasil.shen` carries its own `ygg.*` versions.
 - Compiled KL carries explicit property-table arguments — e.g. the
   external-symbols registration is a 5-element `put` node, not 4.
 - **Stage 1 runs on all seven ports** (verified 2026-06-12 for `fib` and
@@ -220,13 +221,13 @@ mode refuses eval-capable manifests).
   `bootstrap` (shen→KL) compiler and each had a way of emitting non-portable KL
   (shen-julia and shen-swift were the exceptions — both matched byte-for-byte
   with no portability fix):
-  - **shen-cl** — reference host, fastest (~0.06 s): `shen eval -q -l ratatoskr.shen -e '(ratatoskr.shake ["prog.shen"] "out")'`
-  - **shen-lua** — `bin/shen ratatoskr.shen -e '(ratatoskr.shake ...)'`. Its native engine compiled `prolog?` to port-local `shen.lua-run-query*` hooks; that expansion is now gated to skip the dynamic extent of `bootstrap`, so compiled `.kl` carries the kernel's portable CPS expansion.
-  - **shen-go** — `shen eval -q -l ratatoskr.shen -e '(ratatoskr.shake ...)'`. Gained the standard launcher CLI (`extension-launcher.kl`); the stock binary previously had no `-l`/`-e` and fell straight into the REPL.
-  - **shen-rust** — `shen-rust eval -l ratatoskr.shen -e '(ratatoskr.shake ...)'`. Gained the same launcher CLI (on a 1 GB-stack thread for the deep call-graph walk); also fixed `open/2` to honour the `in`/`out` direction symbol so the KL writers truncate-for-write.
-  - **ShenScript** — `node bin/shen.js eval -l ratatoskr.shen -e '(ratatoskr.shake ...)'`. The async `read-byte`/file streams left EOF as an unsettled promise, so `read-file-as-bytelist` looped forever (the 50-min hang); file streams are now synchronous and the shake finishes in ~25 s.
-  - **shen-julia** — `shen-julia/bin/shen eval -l ratatoskr.shen -e '(ratatoskr.shake ...)'` (omit `-q`: like shen-lua/shen-rust, `*hush*` would otherwise silence the `pr` writes; a host-side `pr` override makes `*hush*` gate only stdout). Pre-create the output dir (the shake doesn't `mkdir`). Produced byte-identical `kernel.kl` + manifests on the first try — no portability fix needed.
-  - **shen-swift** — `shen-swift/.build/release/shen-swift eval -q -l ratatoskr.shen -e '(ratatoskr.shake ...)'`. Tree-walking KLambda interpreter (iOS-capable), drives the standard `extension-launcher.kl` CLI. A host-side `pr` override gates `*hush*` to stdout only (file streams always write), so `-q` is safe. Produced byte-identical `kernel.kl` + manifests against the shen-cl reference on the first try — no portability fix needed.
+  - **shen-cl** — reference host, fastest (~0.06 s): `shen eval -q -l yggdrasil.shen -e '(yggdrasil.shake ["prog.shen"] "out")'`
+  - **shen-lua** — `bin/shen yggdrasil.shen -e '(yggdrasil.shake ...)'`. Its native engine compiled `prolog?` to port-local `shen.lua-run-query*` hooks; that expansion is now gated to skip the dynamic extent of `bootstrap`, so compiled `.kl` carries the kernel's portable CPS expansion.
+  - **shen-go** — `shen eval -q -l yggdrasil.shen -e '(yggdrasil.shake ...)'`. Gained the standard launcher CLI (`extension-launcher.kl`); the stock binary previously had no `-l`/`-e` and fell straight into the REPL.
+  - **shen-rust** — `shen-rust eval -l yggdrasil.shen -e '(yggdrasil.shake ...)'`. Gained the same launcher CLI (on a 1 GB-stack thread for the deep call-graph walk); also fixed `open/2` to honour the `in`/`out` direction symbol so the KL writers truncate-for-write.
+  - **ShenScript** — `node bin/shen.js eval -l yggdrasil.shen -e '(yggdrasil.shake ...)'`. The async `read-byte`/file streams left EOF as an unsettled promise, so `read-file-as-bytelist` looped forever (the 50-min hang); file streams are now synchronous and the shake finishes in ~25 s.
+  - **shen-julia** — `shen-julia/bin/shen eval -l yggdrasil.shen -e '(yggdrasil.shake ...)'` (omit `-q`: like shen-lua/shen-rust, `*hush*` would otherwise silence the `pr` writes; a host-side `pr` override makes `*hush*` gate only stdout). Pre-create the output dir (the shake doesn't `mkdir`). Produced byte-identical `kernel.kl` + manifests on the first try — no portability fix needed.
+  - **shen-swift** — `shen-swift/.build/release/shen-swift eval -q -l yggdrasil.shen -e '(yggdrasil.shake ...)'`. Tree-walking KLambda interpreter (iOS-capable), drives the standard `extension-launcher.kl` CLI. A host-side `pr` override gates `*hush*` to stdout only (file streams always write), so `-q` is safe. Produced byte-identical `kernel.kl` + manifests against the shen-cl reference on the first try — no portability fix needed.
   - **`*hush*` caveat**: `-q` sets `*hush*`, and on **shen-lua and
     shen-rust** that silences the `pr` writes to the output files,
     producing zero-byte artifacts — **omit `-q` on those two**. shen-cl
@@ -252,9 +253,9 @@ Byte-identical KL across hosts is necessary but **not sufficient**: the same KL
 can still *execute* differently per target (integer width, symbol interning,
 hash iteration order, memoisation), so a slice can pass every byte-identity check
 and still return wrong, boot-order-dependent answers on one target — the failure
-shen-cas hit on shen-rust ([issue #8](https://github.com/pyrex41/ratatoskr/issues/8)).
+shen-cas hit on shen-rust ([issue #8](https://github.com/pyrex41/yggdrasil/issues/8)).
 
-`ratatoskr parity PROG OUTDIR` closes that gap: it shakes once, then runs the
+`yggdrasil parity PROG OUTDIR` closes that gap: it shakes once, then runs the
 slice through each stage-2 target and diffs the rendered output against a
 reference (`--reference`, default `lisp`) or a committed golden (`--expect FILE`).
 Each artifact is run twice as separate processes, and a fixture that prints two
@@ -263,7 +264,7 @@ checked for in-process determinism (pass 1 == pass 2) — catching boot-order
 nondeterminism within a single run. See [`docs/parity.md`](docs/parity.md).
 
 ```bash
-ratatoskr parity tests/parity.shen out/ --expect tests/parity.expected
+yggdrasil parity tests/parity.shen out/ --expect tests/parity.expected
 # parity gate: parity.shen  (truth = expect:parity.expected)
 # target   build  vs-truth  two-boot  two-pass
 # lua      ok     ok        ok        ok
@@ -284,11 +285,10 @@ executable via `c:build-program`, with boot replayed at program startup.
 
 ## Name and lineage
 
-This project was previously published as "Yggdrasil 2.0". It was renamed
-to Ratatoskr to leave the Yggdrasil name to Dr. Tarver's original work,
-of which this is an independent continuation — same idea, retargeted and
-rebuilt for the 41.2 kernel. If you need to relate the two: Ratatoskr ≈
-Yggdrasil 2.0.
+This is the continuation of Dr. Tarver's Yggdrasil 1.0, retargeted and
+rebuilt for the 41.2 kernel. It was briefly published under another Norse
+name; the original **Yggdrasil** name and `yggdrasil` interface are now
+canonical again.
 
 [shen-cl]: https://github.com/Shen-Language/shen-cl
 [showboat]: https://github.com/simonw/showboat

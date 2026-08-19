@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Ratatoskr — stage-2 Swift (shen-swift) builder.
+# Yggdrasil — stage-2 Swift (shen-swift) builder.
 #
 #   builders/swift/build.sh <shaken-dir> <out-dir>
 #
-# <shaken-dir> is a (ratatoskr.shake ...) output (kernel.kl + user .kl +
-# ratatoskr.manifest). Produces a self-contained artifact at <out-dir>: the
+# <shaken-dir> is a (yggdrasil.shake ...) output (kernel.kl + user .kl +
+# yggdrasil.manifest). Produces a self-contained artifact at <out-dir>: the
 # shaken kernel + user slice plus a `run` launcher that drives the shen-swift
 # tree-walking interpreter in `--shaken` mode (boot the minimal slice instead
 # of the full 19-file kernel, then run the program to completion).
@@ -34,7 +34,7 @@ case "$OUT" in /*) ;; *) OUT="$PWD/$OUT" ;; esac
 mkdir -p "$OUT"
 
 # The user .kl filename from the manifest (one expected for build/run).
-USER_KL="$(sed -n 's/^user=//p' "$DIR/ratatoskr.manifest.txt" | head -1)"
+USER_KL="$(sed -n 's/^user=//p' "$DIR/yggdrasil.manifest.txt" | head -1)"
 [ -n "$USER_KL" ] || { echo "swift: no user= in manifest" >&2; exit 1; }
 
 # Resolve the shen-swift binary; build a release binary if none is provided and
@@ -67,4 +67,4 @@ exec "\$BIN" --shaken "\$HERE/kernel.kl" "\$HERE/user.kl" "\$@"
 SH
 chmod +x "$OUT/run"
 
-echo "ratatoskr/swift: built $OUT (run: $OUT/run)"
+echo "yggdrasil/swift: built $OUT (run: $OUT/run)"

@@ -1,4 +1,4 @@
-;;; Ratatoskr - stage-2 Common Lisp driver (SBCL / CLISP / ECL).
+;;; Yggdrasil - stage-2 Common Lisp driver (SBCL / CLISP / ECL).
 ;;;
 ;;; Run with the staged directory as the working directory:
 ;;;     sbcl  --non-interactive --no-userinit --no-sysinit --load driver.lsp
@@ -7,7 +7,7 @@
 ;;;
 ;;; Expects alongside this file (staged by builders/lisp/build.shen):
 ;;;     package.lsp primitives.lsp native.lsp shen-utils.lsp overwrite.lsp
-;;;     kernel.lsp <user>.lsp ratatoskr.config.lsp
+;;;     kernel.lsp <user>.lsp yggdrasil.config.lsp
 ;;;     compiler.lsp (eval-capable builds only: manifest needs-eval=true)
 ;;;
 ;;; Mirrors the minimal subset of shen-cl's boot.lsp:
@@ -43,11 +43,11 @@
 #+sbcl (declaim (sb-ext:muffle-conditions warning sb-ext:compiler-note))
 #+sbcl (setf sb-ext:*muffled-warnings* t)
 
-;; Build parameters: ratatoskr-user-names (user module base names, in
-;; manifest order) and ratatoskr-exe (path for the saved executable).
-(load "ratatoskr.config.lsp")
+;; Build parameters: yggdrasil-user-names (user module base names, in
+;; manifest order) and yggdrasil-exe (path for the saved executable).
+(load "yggdrasil.config.lsp")
 
-(defun ratatoskr-exit (code)
+(defun yggdrasil-exit (code)
   #+sbcl  (sb-ext:exit :code code :abort (/= code 0))
   #+clisp (ext:exit code)
   #+ecl   (si:quit code))
@@ -59,14 +59,14 @@
 ;; so eval form by form and skip patches whose kernel target is absent.
 ;; A skipped patch is sound exactly when its target lies outside the
 ;; shaken footprint.
-(defun ratatoskr-load-overwrite (file)
+(defun yggdrasil-load-overwrite (file)
   (with-open-file (in file)
     (loop with eof = (list :eof)
           for form = (read in nil eof)
           until (eq form eof)
           do (handler-case (eval form)
                (error (c)
-                 (format t "~&;; ratatoskr: skipped overwrite form (~{~S~^ ~} ...): ~A~%"
+                 (format t "~&;; yggdrasil: skipped overwrite form (~{~S~^ ~} ...): ~A~%"
                          (if (consp form)
                              (subseq form 0 (min 2 (length form)))
                              (list form))
@@ -76,7 +76,7 @@
 ;; KL pr runs and needs the optional stream primitives (the manifest's
 ;; primitive-optional= pair plus the char-stream predicates).  Installed
 ;; only when missing, after overwrite.lsp has had its chance.
-(defun ratatoskr-install-stream-fallbacks ()
+(defun yggdrasil-install-stream-fallbacks ()
   (unless (fboundp '|shen.char-stoutput?|)
     (setf (symbol-function '|shen.char-stoutput?|)
           (lambda (s)
@@ -97,9 +97,9 @@
             (let ((c (read-char s nil nil)))
               (if c (string c) ""))))))
 
-;; Run each user module's |ratatoskr.toplevel-<name>| (its toplevel
+;; Run each user module's |yggdrasil.toplevel-<name>| (its toplevel
 ;; non-defun forms, in source order), in manifest order; then exit.
-(defun ratatoskr-toplevel ()
+(defun yggdrasil-toplevel ()
   (let ((*package* (find-package :shen)))
     ;; Streams captured at image-save time may be dead on restart (CLISP
     ;; keeps the closed object; SBCL transparently revives fd streams).
@@ -109,57 +109,57 @@
       (setq |*sterror*| *error-output*))
     (handler-case
         (progn
-          (dolist (name ratatoskr-user-names)
+          (dolist (name yggdrasil-user-names)
             (funcall
-             (or (find-symbol (concatenate 'string "ratatoskr.toplevel-" name)
+             (or (find-symbol (concatenate 'string "yggdrasil.toplevel-" name)
                               :shen)
-                 (error "ratatoskr: missing toplevel function for ~A" name))))
+                 (error "yggdrasil: missing toplevel function for ~A" name))))
           (force-output |*stoutput*|)
-          (ratatoskr-exit 0))
+          (yggdrasil-exit 0))
       (error (c)
-        (format *error-output* "~&ratatoskr: uncaught error: ~A~%" c)
+        (format *error-output* "~&yggdrasil: uncaught error: ~A~%" c)
         (force-output *error-output*)
-        (ratatoskr-exit 1)))))
+        (yggdrasil-exit 1)))))
 
 #-ecl
 (progn
-  (defun ratatoskr-import (file)
+  (defun yggdrasil-import (file)
     (load (compile-file file :verbose nil :print nil)))
 
-  (ratatoskr-import "primitives.lsp")
-  (ratatoskr-import "native.lsp")
-  (ratatoskr-import "shen-utils.lsp")
+  (yggdrasil-import "primitives.lsp")
+  (yggdrasil-import "native.lsp")
+  (yggdrasil-import "shen-utils.lsp")
   ;; Eval-capable programs ship shen-cl's KL->Lisp compiler so the eval-kl
   ;; primitive works at runtime; shen-cl's boot loads it in this position.
   ;; initialise-compiler only sets the compiler's two flag globals.
-  (when ratatoskr-needs-eval
-    (ratatoskr-import "compiler.lsp")
+  (when yggdrasil-needs-eval
+    (yggdrasil-import "compiler.lsp")
     (|shen-cl.initialise-compiler|))
-  (ratatoskr-import "kernel.lsp")
-  (ratatoskr-load-overwrite "overwrite.lsp")
-  (ratatoskr-install-stream-fallbacks)
+  (yggdrasil-import "kernel.lsp")
+  (yggdrasil-load-overwrite "overwrite.lsp")
+  (yggdrasil-install-stream-fallbacks)
 
   ;; Builder contract: load kernel, call (shen.initialise), load user code.
   ;; Image-based implementations initialise at build time and capture the
   ;; result in the image, exactly as shen-cl's own boot does.
   (|shen.initialise|)
 
-  (dolist (name ratatoskr-user-names)
-    (ratatoskr-import (concatenate 'string name ".lsp"))))
+  (dolist (name yggdrasil-user-names)
+    (yggdrasil-import (concatenate 'string name ".lsp"))))
 
 #+sbcl
-(sb-ext:save-lisp-and-die ratatoskr-exe
+(sb-ext:save-lisp-and-die yggdrasil-exe
   :executable t
   :save-runtime-options t
-  :toplevel #'ratatoskr-toplevel)
+  :toplevel #'yggdrasil-toplevel)
 
 #+clisp
 (progn
-  (ext:saveinitmem ratatoskr-exe
+  (ext:saveinitmem yggdrasil-exe
                    :executable t
                    :quiet t
                    :norc t
-                   :init-function #'ratatoskr-toplevel)
+                   :init-function #'yggdrasil-toplevel)
   (ext:exit 0))
 
 ;; ECL compiles intra-file calls as direct C calls, so a kernel function
@@ -179,16 +179,16 @@
 ;; The epilogue replays the boot order at startup: overwrite patches
 ;; (interpreted form-by-form for the skip-on-missing-target behavior),
 ;; then initialise, then the user toplevels.  overwrite.lsp and
-;; ratatoskr.config.lsp therefore ship inside the binary's directory is
+;; yggdrasil.config.lsp therefore ship inside the binary's directory is
 ;; NOT needed - both are baked in: the config was already loaded above
 ;; (its defparameters compile into the prologue object), and the
 ;; overwrite source text is embedded as a literal.
 #+ecl
-(let* ((modules (append '("package" "ratatoskr.config"
+(let* ((modules (append '("package" "yggdrasil.config"
                           "primitives" "native" "shen-utils")
-                        (when ratatoskr-needs-eval '("compiler"))
+                        (when yggdrasil-needs-eval '("compiler"))
                         '("kernel")
-                        ratatoskr-user-names))
+                        yggdrasil-user-names))
        (overwrite-text
         (with-open-file (in "overwrite.lsp")
           (let ((s (make-string (file-length in))))
@@ -199,7 +199,7 @@
        (epilogue
         `(progn
            (in-package :shen)
-           ,@(when ratatoskr-needs-eval '((|shen-cl.initialise-compiler|)))
+           ,@(when yggdrasil-needs-eval '((|shen-cl.initialise-compiler|)))
            (with-input-from-string (in ,overwrite-text)
              (loop with eof = (list :eof)
                    for form = (read in nil eof)
@@ -221,21 +221,21 @@
            (|shen.initialise|)
            (handler-case
                (progn
-                 (dolist (name ',ratatoskr-user-names)
+                 (dolist (name ',yggdrasil-user-names)
                    (funcall
-                    (or (find-symbol (concatenate 'string "ratatoskr.toplevel-" name) :shen)
-                        (error "ratatoskr: missing toplevel function for ~A" name))))
+                    (or (find-symbol (concatenate 'string "yggdrasil.toplevel-" name) :shen)
+                        (error "yggdrasil: missing toplevel function for ~A" name))))
                  (force-output |*stoutput*|)
                  (si:quit 0))
              (error (c)
-               (format *error-output* "~&ratatoskr: uncaught error: ~A~%" c)
+               (format *error-output* "~&yggdrasil: uncaught error: ~A~%" c)
                (si:quit 1)))))
        (objects
         (mapcar (lambda (name)
                   (compile-file (concatenate 'string name ".lsp")
                                 :system-p t :verbose nil :print nil))
                 modules)))
-  (c:build-program ratatoskr-exe
+  (c:build-program yggdrasil-exe
                    :lisp-files objects
                    :epilogue-code epilogue)
   (si:quit 0))

@@ -5,7 +5,7 @@
 
 ## Context
 
-This repo is Ratatoskr, a tree-shaker for Shen programs: stage 1
+This repo is Yggdrasil, a tree-shaker for Shen programs: stage 1
 computes the reachable ShenOSKernel-41.2 slice and emits KLambda + a
 manifest; per-target stage-2 builders compile it for Common Lisp, LuaJIT
 (self-contained ~640 KB .lua), Go (static ~4.5 MB binary), Rust, and
@@ -18,7 +18,7 @@ A Cedar/OPA-class authorization engine where the policy language, the
 analyses, and the production decision engine are **one Shen source**.
 The hook: AWS Cedar maintains Dafny proofs *alongside* a separate Rust
 implementation and must keep them in sync; OPA/Rego has no proofs at all.
-Here there is nothing to keep in sync — and Ratatoskr's multi-target story
+Here there is nothing to keep in sync — and Yggdrasil's multi-target story
 is the moat: the **same shaken slice** becomes the Lua module in the API
 gateway, the Go middleware in the services, the JS module in the Node
 services, and the Rust library at the edge. Identical decision semantics by construction, not by discipline.
@@ -61,7 +61,7 @@ services, and the Rust library at the edge. Identical decision semantics by cons
 - Keep the artifact eval-strippable; the authoring/analysis tool may use
   the full reader and eval machinery.
 - Shen's `read-file` is not a data reader; parse policy files as text.
-- 41.2 stlib is lazily materialised in ports — use the `rat.*` helpers.
+- 41.2 stlib is lazily materialised in ports — use the `ygg.*` helpers.
 - Benchmark Lua-path decision latency early; specialization should keep
   it to straight dispatch, but verify under wrk before widening scope.
 

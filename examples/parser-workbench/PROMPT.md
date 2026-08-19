@@ -4,7 +4,7 @@
 
 ## Context
 
-This repo is Ratatoskr, a tree-shaker for Shen programs: stage 1
+This repo is Yggdrasil, a tree-shaker for Shen programs: stage 1
 computes the reachable ShenOSKernel-41.2 slice and emits KLambda + a
 manifest; per-target stage-2 builders compile it for Common Lisp, LuaJIT,
 Go, Rust, and JavaScript. See README.md and DEMO.md for exact invocations.
@@ -18,7 +18,7 @@ out, on five runtimes.**
 
 The motivating claim: parsers of untrusted input are where the CVEs live,
 and the langsec answer — parse with verified grammars, not hand-rolled
-pointer arithmetic — rarely meets production runtimes. `defcc` + Ratatoskr
+pointer arithmetic — rarely meets production runtimes. `defcc` + Yggdrasil
 closes that gap.
 
 ## What it does
@@ -58,7 +58,7 @@ closes that gap.
   interpretation is too slow.
 - Shen's `read-file` is not a data reader; the corpus loader and any
   cache files must be plain text/bytes.
-- 41.2 stlib is lazily materialised in ports — use the `rat.*` helpers.
+- 41.2 stlib is lazily materialised in ports — use the `ygg.*` helpers.
 
 ## Deliverables
 

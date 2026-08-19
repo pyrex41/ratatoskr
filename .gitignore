@@ -7,8 +7,8 @@ KLambda/callgraph-*.shen
 pybin/*/_bin/
 
 # Default `go build` output.
-/ratatoskr
-/ratatoskr_bin
+/yggdrasil
+/yggdrasil_bin
 
 # Local launcher binaries built by integration scripts.
 .bin/

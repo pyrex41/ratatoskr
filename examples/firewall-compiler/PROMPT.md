@@ -4,12 +4,12 @@
 
 ## Context
 
-This repo is Ratatoskr, a tree-shaker for Shen programs. Stage 1
-(`ratatoskr.shen`, run on any certified Shen — developed against a sibling
+This repo is Yggdrasil, a tree-shaker for Shen programs. Stage 1
+(`yggdrasil.shen`, run on any certified Shen — developed against a sibling
 `../shen-cl` checkout) computes the reachable slice of the ShenOSKernel-41.2
 and writes KLambda + a manifest to an output dir. Stage 2 builders compile
 that slice per target; the LuaJIT builder
-(`../shen-lua/bin/ratatoskr-build.lua <dir> <out.lua>`) produces a
+(`../shen-lua/bin/yggdrasil-build.lua <dir> <out.lua>`) produces a
 self-contained ~640 KB .lua file with ~25 ms startup, and the Go builder
 produces a static binary. When the program never touches an eval-capable
 entry point, eval-stripping leaves only ~100 kernel defuns. See README.md
@@ -22,7 +22,7 @@ where each compiled policy becomes its own tiny Lua artifact running inside
 OpenResty. One sentence: **your firewall policy, as a verified 640 KB Lua
 file.**
 
-## Architecture (two stages, mirroring Ratatoskr's own)
+## Architecture (two stages, mirroring Yggdrasil's own)
 
 1. **Authoring tool** (`policyc.shen`) — full Shen, runs at CI time:
    - Parses a policy DSL with `defcc`. The DSL covers: HTTP method, path
@@ -45,7 +45,7 @@ file.**
      -> action`), plus a tiny request-decoding shim. No interpreter in the
      artifact.
 
-2. **Decision artifact** — shake the emitted program with Ratatoskr
+2. **Decision artifact** — shake the emitted program with Yggdrasil
    (must report `needs-eval=false` in the manifest), build with the Lua
    builder, and load from nginx via `access_by_lua_file`. The Lua side
    needs a small adapter mapping ngx request vars to the artifact's entry
@@ -60,8 +60,8 @@ file.**
   emitted program must not mention `eval`, `read`, `load`, `tc`, etc.
 - Shen's `read-file` is not a data reader (it curries and cons-ifies);
   read policy files as plain text/lines.
-- 41.2 stlib is lazily materialised in port runtimes — reuse the `rat.*`
-  helpers in `ratatoskr.shen` rather than `mapc`/`filter`/etc.
+- 41.2 stlib is lazily materialised in port runtimes — reuse the `ygg.*`
+  helpers in `yggdrasil.shen` rather than `mapc`/`filter`/etc.
 - Keep the v1 predicate language small enough that shadowing stays
   decidable by construction.
 

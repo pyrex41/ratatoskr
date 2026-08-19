@@ -1,4 +1,4 @@
-\\                                           Ratatoskr
+\\                                           Yggdrasil
 \\                  descended from Yggdrasil 1.0, (c) Mark Tarver, 3 clause BSD
 \\
 \\ Tree-shaker for Shen programs, targeting Mark Tarver's refreshed S41.2
@@ -15,18 +15,18 @@
 \\ (per target, lives in each port repo): compile the shaken KL with the
 \\ port's own KL->native compiler.
 \\
-\\ (ratatoskr.shake ["prog.shen"] "out") writes to out/:
+\\ (yggdrasil.shake ["prog.shen"] "out") writes to out/:
 \\    kernel.kl                shaken kernel defuns, in load order
 \\    <prog>.kl                user code compiled to KL
-\\    ratatoskr.manifest       sexp manifest
-\\    ratatoskr.manifest.txt   line-oriented manifest (key=value)
+\\    yggdrasil.manifest       sexp manifest
+\\    yggdrasil.manifest.txt   line-oriented manifest (key=value)
 \\
 \\ Driver contract for builders: load kernel.kl, call (shen.initialise),
 \\ then load the user files in order.  The S41 refresh has no
 \\ shen.initialise of its own - the shake synthesises one from the
 \\ kernel's toplevel init forms - so the contract is unchanged.
 \\
-\\ Run from the Ratatoskr directory: paths below are relative.
+\\ Run from the Yggdrasil directory: paths below are relative.
 
 \\ No package wrapper: 41.2 has no stlib package to import from, and all
 \\ stdlib functions are kernel-defined globals.  The public entry point is
@@ -67,30 +67,30 @@
 \\ mapc/filter/remove-duplicates/copy-file live in 41.2's stlib, which is
 \\ lazily materialised and absent from port runtimes; define our own.
 
-(define rat.mapc
+(define ygg.mapc
   _ [] -> done
-  F [X | Xs] -> (do (F X) (rat.mapc F Xs)))
+  F [X | Xs] -> (do (F X) (ygg.mapc F Xs)))
 
-(define rat.filter
+(define ygg.filter
   _ [] -> []
-  F [X | Xs] -> [X | (rat.filter F Xs)]  where (F X)
-  F [_ | Xs] -> (rat.filter F Xs))
+  F [X | Xs] -> [X | (ygg.filter F Xs)]  where (F X)
+  F [_ | Xs] -> (ygg.filter F Xs))
 
-(define rat.remove-dups
+(define ygg.remove-dups
   [] -> []
-  [X | Xs] -> (rat.remove-dups Xs)  where (element? X Xs)
-  [X | Xs] -> [X | (rat.remove-dups Xs)])
+  [X | Xs] -> (ygg.remove-dups Xs)  where (element? X Xs)
+  [X | Xs] -> [X | (ygg.remove-dups Xs)])
 
-(define rat.copy-file
+(define ygg.copy-file
   From To -> (let Bytes (read-file-as-bytelist From)
                   Sink  (open To out)
-                  Write (rat.mapc (/. B (write-byte B Sink)) Bytes)
+                  Write (ygg.mapc (/. B (write-byte B Sink)) Bytes)
                   Close (close Sink)
                   To))
 
 \\ ============================ stage 1: shake ============================
 
-(define ratatoskr.shake
+(define yggdrasil.shake
   Files Dir -> (let MaxPrint   (value *maximum-print-sequence-size*)
                     Unlimit    (set *maximum-print-sequence-size* 1000000000)
                     Kernel     (kernel-code)
@@ -157,7 +157,7 @@
 
 (define prepare-tops
   Tops false -> Tops
-  Tops true  -> (rat.filter (/. T (not (declare-form? T)))
+  Tops true  -> (ygg.filter (/. T (not (declare-form? T)))
                             (map (fn strip-eval-top) Tops)))
 
 (define declare-form?
@@ -185,12 +185,12 @@
 \\ actually turns the typechecker on is never eval-free and never stripped.
 (define strip-user-declares
   KL false -> KL
-  KL true  -> (map (/. Forms (rat.filter (/. F (not (declare-form? F))) Forms))
+  KL true  -> (map (/. Forms (ygg.filter (/. F (not (declare-form? F))) Forms))
                    KL))
 
 (define strip-eval-top
   [set *macros* _] -> [set *macros* []]
-  [shen.build-lambda-table _] -> [rat.lambdatable-placeholder]
+  [shen.build-lambda-table _] -> [ygg.lambdatable-placeholder]
   T -> T)
 
 \\ Eval-free programs cannot re-enter the macro expander, so the pattern
@@ -260,7 +260,7 @@
 (define load-call-graph
   -> (let Bytes (read-file-as-bytelist (value *callgraph-cache*))
           Rows  (parse-graph Bytes "" [] [])
-          Mark  (rat.mapc (/. Row (put (hd Row) defp true)) Rows)
+          Mark  (ygg.mapc (/. Row (put (hd Row) defp true)) Rows)
           (if (empty? Rows) (error "empty call graph cache~%") Rows)))
 
 \\ parse-graph Bytes Token Row Rows: accumulate chars into Token, tokens
@@ -283,7 +283,7 @@
 
 (define build-call-graph
   Code -> (let Fs    (defun-names Code)
-               Mark  (rat.mapc (/. F (put F defp true)) Fs)
+               Mark  (ygg.mapc (/. F (put F defp true)) Fs)
                Graph (graph-rows Code)
                Save  (save-call-graph Graph)
                Graph))
@@ -327,13 +327,13 @@
 
 (define save-call-graph
   Graph -> (let Sink  (open (value *callgraph-cache*) out)
-                Write (rat.mapc (/. Row (pr-graph-row Row Sink)) Graph)
+                Write (ygg.mapc (/. Row (pr-graph-row Row Sink)) Graph)
                 Close (close Sink)
                 saved))
 
 (define pr-graph-row
   [F | Calls] Sink -> (do (pr (str F) Sink)
-                          (rat.mapc (/. C (pr (cn " " (str C)) Sink)) Calls)
+                          (ygg.mapc (/. C (pr (cn " " (str C)) Sink)) Calls)
                           (pr (n->string 10) Sink)))
 
 \\ ============================ footprint =================================
@@ -397,10 +397,10 @@
 \\ same trick kernel-defun? uses), so populate/collect are O(1) lookups.
 (define index-rows
   [] _ -> done
-  [F | Fs] I -> (do (put F rat.warshall-ix I) (index-rows Fs (+ I 1))))
+  [F | Fs] I -> (do (put F ygg.warshall-ix I) (index-rows Fs (+ I 1))))
 
 (define node-index
-  F -> (trap-error (get F rat.warshall-ix) (/. E 0)))
+  F -> (trap-error (get F ygg.warshall-ix) (/. E 0)))
 
 \\ N*N boolean matrix as a vector of N row-vectors, every cell false (Shen
 \\ vector slots start unpopulated, which is not a boolean - so fill them).
@@ -474,7 +474,7 @@
   _ -> [])
 
 (define footcode
-  Footprint Kernel -> (rat.filter (/. Def (mentioned? Def Footprint)) Kernel))
+  Footprint Kernel -> (ygg.filter (/. Def (mentioned? Def Footprint)) Kernel))
 
 \\ Write-time rewrites of the kept toplevel init forms.  When
 \\ eval-stripping, the arity-table and external-symbols literals are
@@ -490,7 +490,7 @@
       [shen.initialise-arity-table (trim-arity-pairs Lit (keep-set Foot))]
   [put P shen.external-symbols Lit V] Foot true _ ->
       [put P shen.external-symbols (trim-sym-list Lit (keep-set Foot)) V]
-  [rat.lambdatable-placeholder] Foot true Arities ->
+  [ygg.lambdatable-placeholder] Foot true Arities ->
       [set shen.*lambdatable* (consify (lambdatable-entries Foot Arities))]
   T _ _ _ -> T)
 
@@ -556,7 +556,7 @@
 \\ Names worth keeping in the stripped data tables: footprint plus
 \\ primitives, minus the eval entry points (unreachable by construction).
 (define keep-set
-  Foot -> (rat.filter (/. F (not (element? F (value *eval-entry-points*))))
+  Foot -> (ygg.filter (/. F (not (element? F (value *eval-entry-points*))))
                       (append Foot (value *primitives*))))
 
 (define trim-arity-pairs
@@ -612,16 +612,16 @@
 
 (define reaches-caps
   Prims -> (map (fn cap-label)
-                (rat.filter (/. C (cap-reached? C Prims)) (value *capabilities*))))
+                (ygg.filter (/. C (cap-reached? C Prims)) (value *capabilities*))))
 
 (define cannot-reach-caps
   Prims -> (map (fn cap-label)
-                (rat.filter (/. C (not (cap-reached? C Prims))) (value *capabilities*))))
+                (ygg.filter (/. C (not (cap-reached? C Prims))) (value *capabilities*))))
 
 \\ Used by backends that map primitives to copyable implementation files
 \\ (the Tarver model, retained for the Lisp backend).
 (define primfiles
-  Primitives Language -> (rat.remove-dups
+  Primitives Language -> (ygg.remove-dups
                           (mapcan (/. Primitive (get Primitive Language)) Primitives)))
 
 (define copy-primitive-files
@@ -631,7 +631,7 @@
 (define copy-primitive-file
   {string --> string --> string}
   File Dir -> (let Truncate (truncate-filename File "")
-                   Copy (rat.copy-file File (@s Dir "/" Truncate))
+                   Copy (ygg.copy-file File (@s Dir "/" Truncate))
                    Truncate))
 
 (define truncate-filename
@@ -646,7 +646,7 @@
 
 (define write-kl-file
   File Code -> (let Sink  (open File out)
-                    Write (rat.mapc (/. X (do (pr-kl X Sink)
+                    Write (ygg.mapc (/. X (do (pr-kl X Sink)
                                           (pr (make-string "~%~%") Sink))) Code)
                     Close (close Sink)
                     File))
@@ -689,9 +689,9 @@
   Dir UserFiles UserKL Prims ->
      (let NeedsEval (element? eval-kl Prims)
           Fns       (user-arities UserKL)
-          Globals   (rat.filter (/. P (element? P (value *global-primitives*))) Prims)
-          Optional  (rat.filter (/. P (element? P (value *optional-primitives*))) Prims)
-          Required  (rat.filter (/. P (not (or (element? P Globals)
+          Globals   (ygg.filter (/. P (element? P (value *global-primitives*))) Prims)
+          Optional  (ygg.filter (/. P (element? P (value *optional-primitives*))) Prims)
+          Required  (ygg.filter (/. P (not (or (element? P Globals)
                                                (element? P Optional)))) Prims)
           Reaches   (reaches-caps Prims)
           Cannot    (cannot-reach-caps Prims)
@@ -701,24 +701,24 @@
 
 (define user-arities
   [] -> []
-  [[[defun F Args | _] | Forms] | Files] -> [[F (rat.len Args)]
+  [[[defun F Args | _] | Forms] | Files] -> [[F (ygg.len Args)]
                                              | (user-arities [Forms | Files])]
   [[_ | Forms] | Files] -> (user-arities [Forms | Files])
   [[] | Files] -> (user-arities Files))
 
-(define rat.len
+(define ygg.len
   [] -> 0
-  [_ | Xs] -> (+ 1 (rat.len Xs)))
+  [_ | Xs] -> (+ 1 (ygg.len Xs)))
 
 (define write-manifest-sexp
   Dir UserFiles Fns Required Optional Globals NeedsEval Reaches Cannot ->
-    (let Sink (open (@s Dir "/ratatoskr.manifest") out)
-         W1 (pr-kl-line ["ratatoskr-manifest" 2] Sink)
+    (let Sink (open (@s Dir "/yggdrasil.manifest") out)
+         W1 (pr-kl-line ["yggdrasil-manifest" 3] Sink)
          W2 (pr-kl-line ["kernel-version" "41.2-s41r.20260711"] Sink)
          W3 (pr-kl-line ["kernel" "kernel.kl"] Sink)
          W4 (pr-kl-line ["init" shen.initialise] Sink)
          W5 (pr-kl-line ["user" | UserFiles] Sink)
-         W6 (rat.mapc (/. FA (pr-kl-line ["fn" | FA] Sink)) Fns)
+         W6 (ygg.mapc (/. FA (pr-kl-line ["fn" | FA] Sink)) Fns)
          W7 (pr-kl-line ["primitives" | Required] Sink)
          W8 (pr-kl-line ["primitives-optional" | Optional] Sink)
          W9 (pr-kl-line ["globals" | Globals] Sink)
@@ -729,18 +729,17 @@
 
 (define write-manifest-txt
   Dir UserFiles Fns Required Optional Globals NeedsEval Reaches Cannot ->
-    (let Sink (open (@s Dir "/ratatoskr.manifest.txt") out)
-         W1 (pr (make-string "manifest-version=2~%") Sink)
+    (let Sink (open (@s Dir "/yggdrasil.manifest.txt") out)
+         W1 (pr (make-string "manifest-version=3~%") Sink)
          W2 (pr (make-string "kernel-version=41.2-s41r.20260711~%") Sink)
          W3 (pr (make-string "kernel=kernel.kl~%") Sink)
          W4 (pr (make-string "init=shen.initialise~%") Sink)
-         W5 (rat.mapc (/. F (pr (make-string "user=~A~%" F) Sink)) UserFiles)
-         W6 (rat.mapc (/. FA (pr (make-string "fn=~A ~A~%" (hd FA) (hd (tl FA))) Sink)) Fns)
-         W7 (rat.mapc (/. P (pr (make-string "primitive=~A~%" P) Sink)) Required)
-         W8 (rat.mapc (/. P (pr (make-string "primitive-optional=~A~%" P) Sink)) Optional)
-         W9 (rat.mapc (/. P (pr (make-string "global=~A~%" P) Sink)) Globals)
+         W5 (ygg.mapc (/. F (pr (make-string "user=~A~%" F) Sink)) UserFiles)
+         W6 (ygg.mapc (/. FA (pr (make-string "fn=~A ~A~%" (hd FA) (hd (tl FA))) Sink)) Fns)
+         W7 (ygg.mapc (/. P (pr (make-string "primitive=~A~%" P) Sink)) Required)
+         W8 (ygg.mapc (/. P (pr (make-string "primitive-optional=~A~%" P) Sink)) Optional)
+         W9 (ygg.mapc (/. P (pr (make-string "global=~A~%" P) Sink)) Globals)
          WA (pr (make-string "needs-eval=~A~%" NeedsEval) Sink)
-         WB (rat.mapc (/. C (pr (make-string "reaches=~A~%" C) Sink)) Reaches)
-         WC (rat.mapc (/. C (pr (make-string "cannot-reach=~A~%" C) Sink)) Cannot)
+         WB (ygg.mapc (/. C (pr (make-string "reaches=~A~%" C) Sink)) Reaches)
+         WC (ygg.mapc (/. C (pr (make-string "cannot-reach=~A~%" C) Sink)) Cannot)
          (close Sink)))
-
