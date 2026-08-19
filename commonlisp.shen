@@ -1,7 +1,7 @@
 \\                                    Package for Generating Common Lisp
 \\                                    (c) Mark Tarver 2023, 3 clause BSD
 
-\\ No package wrapper (41.1 has no stlib package); see ratatoskr.shen.
+\\ No package wrapper (41.1 has no stlib package); see yggdrasil.shen.
 
 (put "lsp" compiler (fn lisp-compiler))
 
@@ -16,22 +16,22 @@
 (PROCLAIM '(OPTIMIZE (DEBUG 0) (SPEED 3) (SAFETY 3)))
 
 #+SBCL
-(DECLAIM (SB-EXT:MUFFLE-CONDITIONS SB-EXT:COMPILER-NOTE)) 
+(DECLAIM (SB-EXT:MUFFLE-CONDITIONS SB-EXT:COMPILER-NOTE))
 
 #+SBCL
-(SETF SB-EXT:*MUFFLED-WARNINGS* T) 
+(SETF SB-EXT:*MUFFLED-WARNINGS* T)
 
 #+CLISP
 (SETQ *LOAD-VERBOSE* NIL
       *COMPILE-VERBOSE* NIL
       CUSTOM:*COMPILE-WARNINGS* NIL)
-      
+
 (DEFUN cl.wrapper (V14179)
-  (COND ((EQ 'true V14179) T) 
+  (COND ((EQ 'true V14179) T)
         ((EQ 'false V14179) NIL)
-        (T (ERROR c#34;boolean expectedc#34;))))      
-        
-(DEFUN set (X Y) (SET X Y))        
+        (T (ERROR c#34;boolean expectedc#34;))))
+
+(DEFUN set (X Y) (SET X Y))
 
 (SETQ *language* c#34;Common Lispc#34;
       *implementation* (LISP-IMPLEMENTATION-TYPE)
@@ -39,26 +39,26 @@
       *port* 3.2
       *os* (SOFTWARE-TYPE))
 
-#+SBCL      
-(SETQ *release* c#34;2.0.0c#34;)      
+#+SBCL
+(SETQ *release* c#34;2.0.0c#34;)
 
 #+CLISP
 (SETQ *release* c#34;2.49c#34;)")
-      
+
 (put "lsp" driver (fn lispdriver))
 
 (define lispdriver
-  BoilerFile PrimFiles GlobalFile KernelFile UserFiles 
+  BoilerFile PrimFiles GlobalFile KernelFile UserFiles
   -> (make-string "(LOAD ~S)~%(MAPC 'LOAD (LIST ~A))~%(LOAD ~S)~%(LOAD ~S) ~%(MAPC 'LOAD (LIST ~A))"
                        BoilerFile (files PrimFiles) GlobalFile KernelFile (files UserFiles)))
-                       
+
 (define files
   [] -> ""
-  [File | Files] -> (@s (str File) " " (files Files)))                       
-      
+  [File | Files] -> (@s (str File) " " (files Files)))
+
 (put if "lsp" ["Primitives/CL/if.lsp"])
 (put and "lsp" ["Primitives/CL/and.lsp"])
-(put or "lsp" ["Primitives/CL/or.lsp"]) 
+(put or "lsp" ["Primitives/CL/or.lsp"])
 (put cond "lsp" [])
 (put intern "lsp" ["Primitives/CL/intern.lsp"])
 (put pos "lsp" ["Primitives/CL/pos.lsp"])
@@ -91,7 +91,7 @@
 (put * "lsp" ["Primitives/CL/arith.lsp"])
 (put / "lsp" ["Primitives/CL/arith.lsp"])
 (put > "lsp" ["Primitives/CL/arith.lsp"])
-(put < "lsp" ["Primitives/CL/arith.lsp"]) 
+(put < "lsp" ["Primitives/CL/arith.lsp"])
 (put >= "lsp" ["Primitives/CL/arith.lsp"])
 (put <= "lsp" ["Primitives/CL/arith.lsp"])
 (put number? "lsp" ["Primitives/CL/arith.lsp"])

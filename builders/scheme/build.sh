@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Ratatoskr — stage-2 Scheme (Chez) builder.
+# Yggdrasil — stage-2 Scheme (Chez) builder.
 #
 #   builders/scheme/build.sh <shaken-dir> <out-dir>
 #
-# <shaken-dir> is a (ratatoskr.shake ...) output (kernel.kl + user .kl +
-# ratatoskr.manifest). Produces a self-contained Chez Scheme artifact at
+# <shaken-dir> is a (yggdrasil.shake ...) output (kernel.kl + user .kl +
+# yggdrasil.manifest). Produces a self-contained Chez Scheme artifact at
 # <out-dir>: the shaken kernel + user program compiled to Scheme with
 # shen-scheme's own kl->scheme, plus the shen-scheme runtime (chez-prelude +
 # primitives) and a `run` launcher (`chez --script app.scm`).
@@ -31,7 +31,7 @@ case "$OUT" in /*) ;; *) OUT="$PWD/$OUT" ;; esac
 mkdir -p "$OUT"
 
 # The user .kl filename(s) from the manifest (one expected for build/run).
-USER_KL="$(sed -n 's/^user=//p' "$DIR/ratatoskr.manifest.txt" | head -1)"
+USER_KL="$(sed -n 's/^user=//p' "$DIR/yggdrasil.manifest.txt" | head -1)"
 [ -n "$USER_KL" ] || { echo "scheme: no user= in manifest" >&2; exit 1; }
 
 # Stage 1 of the builder: compile shaken kernel.kl + user .kl -> Scheme using
@@ -126,4 +126,4 @@ exec "$CHEZ" --script app.scm "\$@"
 SCM
 chmod +x "$OUT/run"
 
-echo "ratatoskr/scheme: built $OUT (run: $OUT/run)"
+echo "yggdrasil/scheme: built $OUT (run: $OUT/run)"

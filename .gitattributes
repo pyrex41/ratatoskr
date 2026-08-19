@@ -1,0 +1,2 @@
+# The upstream Common Lisp generator is intentionally kept in CRLF form.
+commonlisp.shen text eol=crlf whitespace=-blank-at-eol

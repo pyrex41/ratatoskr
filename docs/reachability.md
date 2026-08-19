@@ -1,13 +1,13 @@
 # Design note: seed-set reachability, not Warshall closure
 
-**Status**: decided (Ratatoskr, June 2026)
-**Code**: `ratatoskr.shen` — `call-graph`, `footprint`, `reach`
+**Status**: decided (Yggdrasil, June 2026)
+**Code**: `yggdrasil.shen` — `call-graph`, `footprint`, `reach`
 **Decision**: compute the shaken footprint with a worklist traversal (BFS/DFS)
 over a cached direct call graph. Do **not** compute the transitive closure
 (Warshall), and do **not** add an external compute step (e.g. Julia) to speed
 a closure up — the closure itself is the wrong tool, not its implementation.
 
-## The problem Ratatoskr actually solves
+## The problem Yggdrasil actually solves
 
 Tree-shaking is: given the kernel call graph and a seed set
 (`shen.initialise` plus every function the user program calls), find all
@@ -17,7 +17,7 @@ That is **single-source (multi-seed) reachability** — one row of the
 reachability relation, unioned over a handful of seeds. It is not all-pairs
 reachability.
 
-## Why the original Yggdrasil used Warshall, and why Ratatoskr dropped it
+## Why the original Yggdrasil used Warshall, and why Yggdrasil dropped it
 
 Tarver's original Yggdrasil computed the full transitive closure of the
 kernel call graph with Warshall's algorithm: Θ(N³), and — because `fdg`
@@ -44,7 +44,7 @@ Beyond the constant-factor pain, the closure computes ~466 thousand
 pairwise answers per shake and then throws away all but one row's worth.
 
 
-## What Ratatoskr does instead
+## What Yggdrasil does instead
 
 1. **Build the direct call graph once** (`build-call-graph`): for each
    `defun`, record which kernel-defined names appear in its body. This is
@@ -80,7 +80,7 @@ down to O(V³/w) ≈ 2.2 × 10⁷ word ops. Objections, in order of importance:
    work buys answers (reachability between arbitrary non-seed pairs) that
    no part of the pipeline consumes.
 2. **Portability is the product.** Stage 1's contract (see the header of
-   `ratatoskr.shen`) is that it is pure Shen against the certified kernel
+   `yggdrasil.shen`) is that it is pure Shen against the certified kernel
    API — no external toolchain. (Host portability in practice is narrower
    than "any certified Shen" because the user KL inherits the host's
    `bootstrap` compiler; see the README gotcha. The shake *logic* is
@@ -106,7 +106,7 @@ toolchain.
 The one closure-shaped idea that earns its keep here is *sink* reachability,
 not all-pairs. The manifest now reports, per shake, which effectful
 capabilities the emitted artifact can invoke. The gateways are grouped
-primitives (`*capabilities*` in `ratatoskr.shen`): `eval` → `eval-kl`,
+primitives (`*capabilities*` in `yggdrasil.shen`): `eval` → `eval-kl`,
 `read` → `read-byte`, `write` → `write-byte`, `file` → `open`/`close`,
 `clock` → `get-time`. A capability is *unreachable* exactly when the
 emitted KL contains none of its gateways, so it is derived for free from
@@ -126,7 +126,7 @@ transpose, still not all-pairs Warshall.
 
 ## Optional Warshall closure (homage)
 
-`warshall-footprint` in `ratatoskr.shen` is the finished version of
+`warshall-footprint` in `yggdrasil.shen` is the finished version of
 Tarver's original — the same iterative Warshall (pivot outermost), built on
 Shen vectors instead of the `array`/`:=`/`for` DSL that never shipped, so it
 actually runs. It is off by default; `(set *use-warshall* true)` routes

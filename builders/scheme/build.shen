@@ -1,8 +1,8 @@
-\\ Ratatoskr stage-2 Scheme (Chez) builder — the KL->Scheme half.
+\\ Yggdrasil stage-2 Scheme (Chez) builder — the KL->Scheme half.
 \\
 \\ Run on shen-scheme AFTER loading its compiler + build helpers:
 \\   shen-scheme eval -q -l src/compiler.shen -l scripts/build.shen \
-\\                     -l <ratroot>/builders/scheme/build.shen \
+\\                     -l <yggroot>/builders/scheme/build.shen \
 \\                     -e "(_scm.initialize-compiler)" \
 \\                     -e "(scm-rat-build \"<shaken-dir>\" \"<user.kl>\" \"<out-dir>\")"
 \\

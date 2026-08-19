@@ -12,7 +12,7 @@ kernel, vendored byte-for-byte from the canonical mirror of his uploads:
   different content). Zip SHA-256:
   `51becbfd60fa8c93c3f8ae5b20b948eaa84c4b1d14ad2f5d2a056002a53ee836`
 
-This is a **lineage switch**: earlier Ratatoskr vendored the community
+This is a **lineage switch**: earlier Yggdrasil vendored the community
 ShenOSKernel-41.2 packaging (Shen-Language/shen-sources, tag `shen-41.2`).
 The S-series kernel differs structurally (and has had the 15-file
 backend.kl layout since 41.1 — see the mirror's PROVENANCE.md for the

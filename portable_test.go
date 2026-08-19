@@ -68,7 +68,7 @@ func TestWebPreflight(t *testing.T) {
 
 	// eval-free: preflight passes.
 	ok := t.TempDir()
-	write(ok, "ratatoskr.manifest.txt", "needs-eval=false\ncannot-reach=eval\n")
+	write(ok, "yggdrasil.manifest.txt", "needs-eval=false\ncannot-reach=eval\n")
 	write(ok, "b.kl", "(defun add2 (V1) (+ V1 2))\n")
 	if err := webPreflight(ok); err != nil {
 		t.Errorf("eval-free program must pass preflight, got: %v", err)
@@ -77,7 +77,7 @@ func TestWebPreflight(t *testing.T) {
 	// eval-capable: preflight fails, names the culprit, and does NOT repeat
 	// the stage-2 builder's impossible "--linked" advice as the remedy.
 	bad := t.TempDir()
-	write(bad, "ratatoskr.manifest.txt", "needs-eval=true\nreaches=eval\n")
+	write(bad, "yggdrasil.manifest.txt", "needs-eval=true\nreaches=eval\n")
 	write(bad, "p.kl", "(tc +)\n\n(defun p (V1) (eval V1))\n")
 	write(bad, "kernel.kl", "(defun shen.eval-without-macros (V1) (eval-kl V1))\n")
 	err := webPreflight(bad)
@@ -105,9 +105,35 @@ func TestLoadBuildersEmbedded(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"lisp", "lua", "go", "rust", "js"} {
+	for _, want := range []string{"lisp", "lua", "go", "rust", "js", "truffle", "truffle-native"} {
 		if _, ok := b[want]; !ok {
 			t.Errorf("missing target %q", want)
+		}
+	}
+}
+
+func TestTruffleBuilderRecipes(t *testing.T) {
+	b, err := loadBuilders()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name, format, output, run0 string
+	}{
+		{"truffle", "jvm", "{outdir}/app-truffle", "{outdir}/app-truffle/bin/shen-truffle"},
+		{"truffle-native", "native", "{outdir}/app-truffle-native", "{outdir}/app-truffle-native"},
+	} {
+		bld, ok := b[tc.name]
+		if !ok || len(bld.Build) != 2 {
+			t.Fatalf("%s: expected Maven packaging and builder steps", tc.name)
+		}
+		argv := bld.Build[len(bld.Build)-1].Argv
+		joined := strings.Join(argv, " ")
+		if !strings.Contains(joined, "--format "+tc.format) || !strings.Contains(joined, tc.output) || !strings.Contains(joined, "--runtime {shen_truffle}/target/shen-truffle.jar") {
+			t.Errorf("%s: recipe = %v", tc.name, argv)
+		}
+		if len(bld.Run) == 0 || bld.Run[0] != tc.run0 {
+			t.Errorf("%s: run = %v, want prefix %q", tc.name, bld.Run, tc.run0)
 		}
 	}
 }

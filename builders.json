@@ -1,16 +1,16 @@
 {
   "_comment": [
-    "Stage-2 builder + run recipes for Ratatoskr, one entry per target.",
-    "Faithful to the showboat-verified DEMO.md. Read by both the `ratatoskr`",
+    "Stage-2 builder + run recipes for Yggdrasil, one entry per target.",
+    "Faithful to the showboat-verified DEMO.md. Read by both the `yggdrasil`",
     "CLI (build/run subcommands) and Bifrost's shake-then-run mode.",
     "",
     "Placeholders substituted at run time (all absolute paths):",
-    "  {ratroot}   Ratatoskr repo root (holds ratatoskr.shen, KLambda/, builders/)",
+    "  {yggroot}   Yggdrasil repo root (holds yggdrasil.shen, KLambda/, builders/)",
     "  {outdir}    the shake output dir (kernel.kl + <prog>.kl + manifest)",
     "  {tmp}       a scratch dir for intermediate build tools",
     "  {shen_lua}/{shen_go}/{shen_rust}/{shenscript}/{shen_julia}/{shen_scheme}/",
-    "  {shen_swift}/{shen_cl}                          sibling port repo roots;",
-    "              default to {ratroot}/../<name>, overridable via the env var",
+    "  {shen_swift}/{shen_cl}/{shen_truffle}            sibling port repo roots;",
+    "              default to {yggroot}/../<name>, overridable via the env var",
     "              named in each target's 'dir_env'.",
     "",
     "Each target: 'build' is a list of steps (argv + optional cwd/env), run in",
@@ -22,33 +22,33 @@
 
   "lisp": {
     "run_impl": "shen-cl",
-    "dir_env": "RATATOSKR_SHEN_CL_DIR",
+    "dir_env": "YGGDRASIL_SHEN_CL_DIR",
     "needs": ["sbcl"],
     "build": [
-      {"argv": ["{ratroot}/builders/lisp/build.sh", "{outdir}", "{outdir}/app-lisp"],
-       "cwd": "{ratroot}", "env": {"LISP_IMPL": "sbcl", "SHEN_CL": "{shen_cl}"}}
+      {"argv": ["{yggroot}/builders/lisp/build.sh", "{outdir}", "{outdir}/app-lisp"],
+       "cwd": "{yggroot}", "env": {"LISP_IMPL": "sbcl", "SHEN_CL": "{shen_cl}"}}
     ],
     "run": ["{outdir}/app-lisp"]
   },
 
   "lua": {
     "run_impl": "shen-lua",
-    "dir_env": "RATATOSKR_SHEN_LUA_DIR",
+    "dir_env": "YGGDRASIL_SHEN_LUA_DIR",
     "needs": ["luajit"],
     "build": [
-      {"argv": ["luajit", "{shen_lua}/bin/ratatoskr-build.lua", "{outdir}", "{outdir}/app.lua"]}
+      {"argv": ["luajit", "{shen_lua}/bin/yggdrasil-build.lua", "{outdir}", "{outdir}/app.lua"]}
     ],
     "run": ["luajit", "{outdir}/app.lua"]
   },
 
   "go": {
     "run_impl": "shen-go",
-    "dir_env": "RATATOSKR_SHEN_GO_DIR",
+    "dir_env": "YGGDRASIL_SHEN_GO_DIR",
     "needs": ["go"],
     "build": [
-      {"argv": ["go", "build", "-o", "{tmp}/ratatoskr-build", "./cmd/ratatoskr-build"],
+      {"argv": ["go", "build", "-o", "{tmp}/yggdrasil-build", "./cmd/yggdrasil-build"],
        "cwd": "{shen_go}"},
-      {"argv": ["{tmp}/ratatoskr-build", "-shen-go", "{shen_go}", "{outdir}", "{outdir}/app-go"]},
+      {"argv": ["{tmp}/yggdrasil-build", "-shen-go", "{shen_go}", "{outdir}", "{outdir}/app-go"]},
       {"argv": ["go", "build", "-o", "{outdir}/app-go-bin", "."], "cwd": "{outdir}/app-go"}
     ],
     "run": ["{outdir}/app-go-bin"]
@@ -56,10 +56,10 @@
 
   "rust": {
     "run_impl": "shen-rust",
-    "dir_env": "RATATOSKR_SHEN_RUST_DIR",
+    "dir_env": "YGGDRASIL_SHEN_RUST_DIR",
     "needs": ["cargo"],
     "build": [
-      {"argv": ["cargo", "run", "-q", "--release", "-p", "ratatoskr-build", "--",
+      {"argv": ["cargo", "run", "-q", "--release", "-p", "yggdrasil-build", "--",
                 "{outdir}", "{outdir}/app-rust"], "cwd": "{shen_rust}"},
       {"argv": ["cargo", "build", "--release", "-q"], "cwd": "{outdir}/app-rust"}
     ],
@@ -68,20 +68,20 @@
 
   "js": {
     "run_impl": "ShenScript",
-    "dir_env": "RATATOSKR_SHENSCRIPT_DIR",
+    "dir_env": "YGGDRASIL_SHENSCRIPT_DIR",
     "needs": ["node"],
     "build": [
-      {"argv": ["node", "{shenscript}/bin/ratatoskr-build.js", "{outdir}", "{outdir}/app.js"]}
+      {"argv": ["node", "{shenscript}/bin/yggdrasil-build.js", "{outdir}", "{outdir}/app.js"]}
     ],
     "run": ["node", "{outdir}/app.js"]
   },
 
   "julia": {
     "run_impl": "shen-julia",
-    "dir_env": "RATATOSKR_SHEN_JULIA_DIR",
+    "dir_env": "YGGDRASIL_SHEN_JULIA_DIR",
     "needs": ["julia"],
     "build": [
-      {"argv": ["julia", "--project={shen_julia}", "{shen_julia}/bin/ratatoskr-build.jl",
+      {"argv": ["julia", "--project={shen_julia}", "{shen_julia}/bin/yggdrasil-build.jl",
                 "{outdir}", "{outdir}/app-julia", "--sysimage"]}
     ],
     "run": ["{outdir}/app-julia/run"]
@@ -89,10 +89,10 @@
 
   "scheme": {
     "run_impl": "shen-scheme",
-    "dir_env": "RATATOSKR_SHEN_SCHEME_DIR",
+    "dir_env": "YGGDRASIL_SHEN_SCHEME_DIR",
     "needs": ["chez"],
     "build": [
-      {"argv": ["{ratroot}/builders/scheme/build.sh", "{outdir}", "{outdir}/app-scheme"],
+      {"argv": ["{yggroot}/builders/scheme/build.sh", "{outdir}", "{outdir}/app-scheme"],
        "env": {"SHEN_SCHEME": "{shen_scheme}"}}
     ],
     "run": ["{outdir}/app-scheme/run"]
@@ -100,10 +100,10 @@
 
   "swift": {
     "run_impl": "shen-swift",
-    "dir_env": "RATATOSKR_SHEN_SWIFT_DIR",
+    "dir_env": "YGGDRASIL_SHEN_SWIFT_DIR",
     "needs": ["swift"],
     "build": [
-      {"argv": ["{ratroot}/builders/swift/build.sh", "{outdir}", "{outdir}/app-swift"],
+      {"argv": ["{yggroot}/builders/swift/build.sh", "{outdir}", "{outdir}/app-swift"],
        "env": {"SHEN_SWIFT": "{shen_swift}"}}
     ],
     "run": ["{outdir}/app-swift/run"]
@@ -111,11 +111,37 @@
 
   "hvm": {
     "run_impl": "shen-inets",
-    "dir_env": "RATATOSKR_SHEN_INETS_DIR",
+    "dir_env": "YGGDRASIL_SHEN_INETS_DIR",
     "needs": ["python3", "hvm"],
     "build": [
       {"argv": ["python3", "{shen_inets}/build_shake.py", "{outdir}", "{outdir}/app.hvml"]}
     ],
     "run": ["python3", "{shen_inets}/run_app.py", "{outdir}/app.hvml"]
+  },
+
+  "truffle": {
+    "run_impl": "shen-truffle",
+    "dir_env": "YGGDRASIL_SHEN_TRUFFLE_DIR",
+    "needs": ["java", "mvn"],
+    "build": [
+      {"argv": ["mvn", "-q", "-DskipTests", "package"], "cwd": "{shen_truffle}"},
+      {"argv": ["java", "-jar", "{shen_truffle}/target/yggdrasil-builder.jar",
+                "--format", "jvm", "--runtime", "{shen_truffle}/target/shen-truffle.jar",
+                "{outdir}", "{outdir}/app-truffle"]}
+    ],
+    "run": ["{outdir}/app-truffle/bin/shen-truffle"]
+  },
+
+  "truffle-native": {
+    "run_impl": "shen-truffle-native",
+    "dir_env": "YGGDRASIL_SHEN_TRUFFLE_DIR",
+    "needs": ["java", "mvn", "native-image"],
+    "build": [
+      {"argv": ["mvn", "-q", "-DskipTests", "package"], "cwd": "{shen_truffle}"},
+      {"argv": ["java", "-jar", "{shen_truffle}/target/yggdrasil-builder.jar",
+                "--format", "native", "--runtime", "{shen_truffle}/target/shen-truffle.jar",
+                "{outdir}", "{outdir}/app-truffle-native"]}
+    ],
+    "run": ["{outdir}/app-truffle-native"]
   }
 }

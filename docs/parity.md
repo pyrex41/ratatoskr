@@ -1,6 +1,6 @@
 # Behavioural parity gate
 
-Ratatoskr's headline guarantee is that all seven ports emit a **byte-identical**
+Yggdrasil's headline guarantee is that all seven ports emit a **byte-identical**
 `kernel.kl` + manifest and portable user KL. That proves the *slice* is the same
 bytes everywhere. It does **not** prove the slice *computes the same thing* on
 each target.
@@ -25,7 +25,7 @@ target and diffs the rendered output against a reference and against itself.
 ## Usage
 
 ```bash
-ratatoskr parity PROG OUTDIR [--target a,b] [--reference R] [--expect FILE] [--time]
+yggdrasil parity PROG OUTDIR [--target a,b] [--reference R] [--expect FILE] [--time]
 ```
 
 - `--target a,b` — comma-separated targets to check. Default: every target whose
@@ -89,8 +89,8 @@ To gate your own program, make a fixture that:
 Then capture the golden once and gate it:
 
 ```bash
-ratatoskr run    myprog.shen out/ --target lisp > myprog.expected   # capture once, from the reference
-ratatoskr parity myprog.shen out/ --expect myprog.expected           # gate every target against it
+yggdrasil run    myprog.shen out/ --target lisp > myprog.expected   # capture once, from the reference
+yggdrasil parity myprog.shen out/ --expect myprog.expected           # gate every target against it
 ```
 
 ## Limitations
